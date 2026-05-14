@@ -1,5 +1,6 @@
-from pydbml.execution.evaluator import Evaluator
-
+from pydbml.execution.ast_evaluator import ASTEvaluator
+from pydbml.parser.parser import Parser
+from pydbml.runtime.environment import Environment
 
 class Engine:
     """
@@ -8,10 +9,13 @@ class Engine:
     """
 
     def __init__(self):
-        self.evaluator = Evaluator()
+        self.env = Environment()
+        self.evaluator = ASTEvaluator(self.env)
 
     def execute(self, code: str):
         """
         Execute a single line of PyDBML code.
         """
-        return self.evaluator.evaluate(code)
+        parser = Parser(code)
+        ast = parser.parse()
+        return self.evaluator.evaluate(ast)
