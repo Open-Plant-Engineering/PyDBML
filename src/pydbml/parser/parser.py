@@ -7,7 +7,7 @@ from pydbml.ast.nodes import (
     AssignNode,
     BinaryOpNode,
     IfNode,
-    IndexAccessNode,
+    IndexAssignNode,
 )
 
 
@@ -26,8 +26,12 @@ class Parser:
     # Statement
     # --------------------------
     def statement(self):
-        # Assignment: VAR = expr
+
+        # ✅ handle index assignment FIRST
         if self._peek().type in ("LOCAL_VAR", "GLOBAL_VAR"):
+            if self._is_index_assignment():
+                return self._parse_index_assignment()
+
             if self._peek_next() and self._peek_next().type == "EQUAL":
                 return self.assignment()
 
@@ -116,18 +120,47 @@ class Parser:
         # --------------------------
         if token.type == "STRING":
             return StringNode(token.value.strip("'"))
+    
+        # ✅ ADD THIS BLOCK HERE
+        if token.type == "IDENTIFIER" and token.value.lower() == "object":
+            from pydbml.ast.nodes import ObjectNode
+    
+            type_token = self._consume()
+    
+            if type_token.type != "IDENTIFIER":
+                raise SyntaxError("Expected type after 'object'")
+    
+            type_name = type_token.value.lower()
+    
+            self._consume_expected("LPAREN")
+            self._consume_expected("RPAREN")
+    
+            return ObjectNode(type_name)
+    
+        if token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
+            is_global = token.type == "GLOBAL_VAR"
+            name = token.value.replace("!", "")
 
-        if token.type == "LOCAL_VAR":
-            return VariableNode(token.value[1:], False)
+            node = VariableNode(name, is_global)
 
-        if token.type == "GLOBAL_VAR":
-            return VariableNode(token.value[2:], True)
+            # ✅ THIS IS THE MISSING PIECE
+            while self._match("LBRACKET"):
+                self._consume()  # [
 
+                index_expr = self.expression()
+
+                self._consume_expected("RBRACKET")
+
+                from pydbml.ast.nodes import IndexAccessNode
+                node = IndexAccessNode(node, index_expr)
+
+            return node
+    
         if token.type == "LPAREN":
             node = self.expression()
             self._consume_expected("RPAREN")
             return node
-
+    
         raise SyntaxError(f"Unexpected token: {token.type}")
 
     # --------------------------
@@ -206,3 +239,55 @@ class Parser:
             return NotNode(self._parse_not())
 
         return self._parse_comparison()
+
+    def _is_index_assignment(self):
+        """
+        Detect pattern: !x[ ... ] = ...
+        """
+
+        if self._peek().type not in ("LOCAL_VAR", "GLOBAL_VAR"):
+            return False
+
+        if not self._peek_next() or self._peek_next().type != "LBRACKET":
+            return False
+
+        pos = self.pos + 1
+        depth = 0
+
+        while pos < len(self.tokens):
+            token = self.tokens[pos]
+
+            if token.type == "LBRACKET":
+                depth += 1
+            elif token.type == "RBRACKET":
+                depth -= 1
+
+                if depth == 0:
+                    if pos + 1 < len(self.tokens) and self.tokens[pos + 1].type == "EQUAL":
+                        return True
+                    return False
+
+            pos += 1
+
+        return False
+    
+    def _parse_index_assignment(self):
+        token = self._consume()
+
+        is_global = token.type == "GLOBAL_VAR"
+        name = token.value.replace("!", "")
+
+        target = VariableNode(name, is_global)
+
+        # parse index
+        self._consume_expected("LBRACKET")
+        index_expr = self.expression()
+        self._consume_expected("RBRACKET")
+
+        # expect '='
+        self._consume_expected("EQUAL")
+
+        # parse value
+        value = self.expression()
+
+        return IndexAssignNode(target, index_expr, value)

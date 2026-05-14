@@ -1,6 +1,16 @@
 from pydbml.types.primitives import Number, String, Boolean
-from pydbml.ast.nodes import IfNode, LogicalOpNode, NotNode, IndexAccessNode, IndexAssignNode, ObjectNode
 from pydbml.types.array import Array
+
+from pydbml.ast.nodes import (
+    IfNode,
+    LogicalOpNode,
+    NotNode,
+    IndexAccessNode,
+    IndexAssignNode,
+    ObjectNode,
+)
+
+from pydbml.utils.debug import debug
 
 
 class ASTEvaluator:
@@ -10,24 +20,96 @@ class ASTEvaluator:
     def evaluate(self, node):
         if node is None:
             return None
-        
+
+        debug("NODE START", node)
+
+        # --------------------------
+        # Object creation
+        # --------------------------
+        if isinstance(node, ObjectNode):
+            debug("OBJECT CREATE", node.type_name)
+
+            if node.type_name == "array":
+                return Array()
+
+            if node.type_name == "string":
+                return String("")
+
+            if node.type_name == "real":
+                return Number(0)
+
+            if node.type_name == "boolean":
+                return Boolean(False)
+
+            raise TypeError(f"Unknown object type: {node.type_name}")
+
+        # --------------------------
+        # Index Assignment
+        # --------------------------
+        if isinstance(node, IndexAssignNode):
+            debug("INDEX ASSIGN NODE", node)
+
+            if node.target.is_global:
+                var = self.env.get_global(node.target.name)
+            else:
+                var = self.env.get(node.target.name)
+
+            array_obj = var.get()
+            debug("ARRAY BEFORE SET", array_obj.value)
+
+            index = self.evaluate(node.index)
+            value = self.evaluate(node.value)
+
+            debug("INDEX VALUE", index)
+            debug("VALUE TO SET", value)
+
+            array_obj.set(int(index.value), value)
+
+            debug("ARRAY AFTER SET", array_obj.value)
+
+            return f"{node.target.name}[{int(index.value)}] set"
+
+        # --------------------------
+        # Index Access
+        # --------------------------
+        if isinstance(node, IndexAccessNode):
+            debug("INDEX ACCESS NODE", node)
+
+            target = self.evaluate(node.target)
+            index = self.evaluate(node.index)
+
+            debug("TARGET ARRAY", target.value)
+            debug("INDEX REQUESTED", index.value)
+
+            result = target.get(int(index.value))
+
+            debug("INDEX RESULT", result)
+
+            return result
+
         # --------------------------
         # NOT
         # --------------------------
         if isinstance(node, NotNode):
             value = self.evaluate(node.operand)
 
+            debug("NOT VALUE", value)
+
             if not isinstance(value, Boolean):
                 raise TypeError("NOT requires BOOLEAN value")
 
             return Boolean(not value.value)
-        
+
         # --------------------------
         # Logical AND / OR
         # --------------------------
         if isinstance(node, LogicalOpNode):
             left = self.evaluate(node.left)
             right = self.evaluate(node.right)
+
+            debug("LOGICAL LEFT", left)
+            debug("LOGICAL RIGHT", right)
+            debug("OPERATOR", node.op)
 
             if not isinstance(left, Boolean) or not isinstance(right, Boolean):
                 raise TypeError("Logical operations require BOOLEAN values")
@@ -37,30 +119,38 @@ class ASTEvaluator:
 
             if node.op == "OR":
                 return Boolean(left.value or right.value)
-            
+
         # --------------------------
         # IF Node
         # --------------------------
         if isinstance(node, IfNode):
             condition = self.evaluate(node.condition)
 
+            debug("IF CONDITION", condition)
+
             if not isinstance(condition, Boolean):
                 raise TypeError("IF condition must evaluate to BOOLEAN")
 
             if condition.value:
+                debug("IF THEN EXECUTED", node.then_branch)
                 return self.evaluate(node.then_branch)
 
             if node.else_branch is not None:
+                debug("IF ELSE EXECUTED", node.else_branch)
                 return self.evaluate(node.else_branch)
 
             return None
-        
+
         # --------------------------
         # Assignment
         # --------------------------
         if node.__class__.__name__ == "AssignNode":
             value = self.evaluate(node.value)
+
+            debug("ASSIGN", f"{node.name} = {value}")
+
             self.env.set(node.name, value, node.is_global)
+
             return f"{node.name} set"
 
         # --------------------------
@@ -69,28 +159,41 @@ class ASTEvaluator:
         if node.__class__.__name__ == "NumberNode":
             return Number(node.value)
 
+        # --------------------------
+        # String
+        # --------------------------
         if node.__class__.__name__ == "StringNode":
             return String(node.value)
 
+        # --------------------------
+        # Boolean
+        # --------------------------
         if node.__class__.__name__ == "BooleanNode":
-           if isinstance(node.value, str):
-               return Boolean(node.value.lower() == "true")
-           return Boolean(node.value)
+            return Boolean(node.value)
 
         # --------------------------
         # Variable
         # --------------------------
         if node.__class__.__name__ == "VariableNode":
             if node.is_global:
-                return self.env.get_global(node.name).get()
-            return self.env.get(node.name).get()
+                value = self.env.get_global(node.name).get()
+            else:
+                value = self.env.get(node.name).get()
+
+            debug("VARIABLE RESOLVE", f"{node.name} → {value}")
+
+            return value
 
         # --------------------------
-        # Binary operation
+        # Binary Operation
         # --------------------------
         if node.__class__.__name__ == "BinaryOpNode":
             left = self.evaluate(node.left)
             right = self.evaluate(node.right)
+
+            debug("BINOP LEFT", left)
+            debug("BINOP RIGHT", right)
+            debug("BINOP OP", node.op)
 
             if node.op == "+":
                 return Number(left.value + right.value)

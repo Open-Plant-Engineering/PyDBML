@@ -1,7 +1,7 @@
 from typing import Dict
 from pydbml.runtime.variable import Variable
 from pydbml.types.base import PyDBMLType
-
+from pydbml.utils.debug import debug
 
 class Environment:
     """
@@ -23,6 +23,7 @@ class Environment:
             self._global[name] = var
         else:
             self._local[name] = var
+        debug("ENV SET", f"{name} = {value}")
 
     # --------------------------
     # Get Variable (IMPORTANT)
@@ -34,6 +35,7 @@ class Environment:
         2. Global
         """
         name = name.lower()
+        debug("ENV GET", f"{name} -> {self._local.get(name) or self._global.get(name)}")
         if name in self._local:
             return self._local[name]
 

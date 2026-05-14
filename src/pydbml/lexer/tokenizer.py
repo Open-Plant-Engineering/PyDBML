@@ -1,6 +1,6 @@
 import re
 from pydbml.lexer.tokens import Token
-
+from pydbml.utils.debug import debug
 
 TOKEN_SPEC = [
     ("NUMBER", r"\d+(\.\d+)?"),
@@ -36,6 +36,10 @@ TOKEN_SPEC = [
 
     ("LPAREN", r"\("),
     ("RPAREN", r"\)"),
+        
+    ("LBRACKET", r"\["),
+    ("RBRACKET", r"\]"),
+    
     ("EQUAL", r"="),
 
     ("IDENTIFIER", r"[a-zA-Z_]\w*"),
@@ -70,4 +74,5 @@ def tokenize(code: str):
 
         tokens.append(Token(kind, value))
 
+    debug("TOKENS", tokens)
     return tokens

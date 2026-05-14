@@ -1,5 +1,5 @@
 from pydbml.types.base import PyDBMLType
-
+from pydbml.utils.debug import debug
 
 class Array(PyDBMLType):
     def __init__(self):
@@ -18,13 +18,16 @@ class Array(PyDBMLType):
 
         if not isinstance(item, PyDBMLType):
             raise TypeError("Array value must be PyDBMLType")
+        
+        debug("ARRAY SET", f"index={index}, value={item}")
+        debug("ARRAY STATE", self.value)
 
         self.value[index] = item
 
     def get(self, index: int):
         if index not in self.value:
             raise KeyError(f"Index {index} not set")
-
+        debug("ARRAY GET", f"index={index}, value={self.value.get(index)}")
         return self.value.get(index)
 
 

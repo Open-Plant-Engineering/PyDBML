@@ -1,6 +1,8 @@
 from pydbml.execution.ast_evaluator import ASTEvaluator
 from pydbml.parser.parser import Parser
 from pydbml.runtime.environment import Environment
+from pydbml.utils.debug import debug
+
 
 class Engine:
     """
@@ -18,4 +20,8 @@ class Engine:
         """
         parser = Parser(code)
         ast = parser.parse()
+        
+        debug("CODE", code)
+        debug("AST", ast)
+        
         return self.evaluator.evaluate(ast)
