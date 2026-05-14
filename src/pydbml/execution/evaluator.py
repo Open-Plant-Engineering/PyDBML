@@ -56,19 +56,21 @@ class Evaluator:
     # --------------------------
     def _parse_value(self, raw: str):
 
-        raw = raw.strip().lower()
+        raw = raw.strip()
+
+        raw_lower = raw.lower()
 
         # ✅ PML-style object creation
-        if raw == "object array()":
+        if raw_lower == "object array()":
             return Array()
 
-        if raw == "object string()":
+        if raw_lower == "object string()":
             return String("")
 
-        if raw == "object real()":
+        if raw_lower == "object real()":
             return Number(0)
 
-        if raw == "object boolean()":
+        if raw_lower == "object boolean()":
             return Boolean(False)
 
         # string
@@ -76,8 +78,8 @@ class Evaluator:
             return String(raw.strip("'"))
 
         # boolean
-        if raw in ("true", "false"):
-            return Boolean(raw == "true")
+        if raw_lower in ("true", "false"):
+            return Boolean(raw_lower == "true")
 
         # number
         try:

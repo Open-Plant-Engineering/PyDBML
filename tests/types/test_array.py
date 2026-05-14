@@ -1,13 +1,16 @@
-import pytest
 from pydbml.types.array import Array
 from pydbml.types.primitives import String, Number
 
 
 def test_array_valid():
-    arr = Array([String("a"), Number(1)])
-    arr.validate()
+    arr = Array()
 
+    arr.set(1, String("a"))
+    arr.set(2, Number(1))
 
-def test_array_invalid_raw_python():
-    with pytest.raises(TypeError):
-        Array([1, 2, 3]).validate()
+    assert arr.get(1).value == "a"
+    assert arr.get(2).value == 1
+
+def test_empty_array():
+    arr = Array()
+    assert str(arr) == "<ARRAY>"
