@@ -1,18 +1,31 @@
-from typing import List
-from .base import PyDBMLType
+from pydbml.types.base import PyDBMLType
 
 
 class Array(PyDBMLType):
-    def __init__(self, value: List[PyDBMLType]):
-        super().__init__(value)
+    def __init__(self):
+        super().__init__({})  # use dict for sparse array
 
-    def validate(self) -> None:
-        if not isinstance(self.value, list):
-            raise TypeError("Expected list")
+    def validate(self):
+        if not isinstance(self.value, dict):
+            raise TypeError("Array must be dict-based")
 
-        for item in self.value:
-            if not isinstance(item, PyDBMLType):
-                raise TypeError("Array must contain PyDBMLType values")
+    def set(self, index: int, item: PyDBMLType):
+        if index < 1:
+            raise ValueError("Array index starts from 1")
+        self.value[index] = item
 
-    def to_python(self):
-        return [item.to_python() for item in self.value]
+    def get(self, index: int):
+        return self.value.get(index)
+
+
+    def __str__(self):
+        if not self.value:
+            return "<ARRAY>"
+
+        lines = ["<ARRAY>"]
+
+        for idx in sorted(self.value.keys()):
+            item = self.value[idx]
+            lines.append(f"   [{idx}] {item}")
+
+        return "\n".join(lines)
