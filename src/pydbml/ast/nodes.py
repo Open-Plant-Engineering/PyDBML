@@ -2,7 +2,6 @@ class ASTNode:
     def __repr__(self):
         return self.__class__.__name__ + str(self.__dict__)
 
-
 # --------------------------
 # Literals
 # --------------------------
@@ -10,16 +9,13 @@ class NumberNode(ASTNode):
     def __init__(self, value):
         self.value = value
 
-
 class StringNode(ASTNode):
     def __init__(self, value):
         self.value = value
 
-
 class BooleanNode(ASTNode):
     def __init__(self, value):
         self.value = value
-
 
 # --------------------------
 # Variables
@@ -29,7 +25,6 @@ class VariableNode(ASTNode):
         self.name = name
         self.is_global = is_global
 
-
 # --------------------------
 # Assignment
 # --------------------------
@@ -38,7 +33,6 @@ class AssignNode(ASTNode):
         self.name = name
         self.value = value
         self.is_global = is_global
-
 
 # --------------------------
 # Binary Operation
@@ -79,7 +73,6 @@ class IndexAccessNode(ASTNode):
         self.target = target
         self.index = index
 
-
 # --------------------------
 # Array Assignment
 # --------------------------
@@ -95,3 +88,20 @@ class IndexAssignNode(ASTNode):
 class ObjectNode(ASTNode):
     def __init__(self, type_name):
         self.type_name = type_name
+
+# --------------------------
+# Dot Access
+# --------------------------
+class DotAccessNode(ASTNode):
+    def __init__(self, target, attribute):
+        self.target = target
+        self.attribute = attribute
+
+# --------------------------
+# Dot Assignment
+# --------------------------
+class DotAssignNode(ASTNode):
+    def __init__(self, target, attribute, value):
+        self.target = target
+        self.attribute = attribute
+        self.value = value

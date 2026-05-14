@@ -8,6 +8,7 @@ from pydbml.ast.nodes import (
     BinaryOpNode,
     IfNode,
     IndexAssignNode,
+    DotAssignNode
 )
 
 
@@ -27,8 +28,11 @@ class Parser:
     # --------------------------
     def statement(self):
 
-        # ✅ handle index assignment FIRST
+        # ✅ DOT assignment FIRST (highest priority)
         if self._peek().type in ("LOCAL_VAR", "GLOBAL_VAR"):
+            if self._is_dot_assignment():
+                return self._parse_dot_assignment()
+
             if self._is_index_assignment():
                 return self._parse_index_assignment()
 
@@ -141,19 +145,37 @@ class Parser:
             is_global = token.type == "GLOBAL_VAR"
             name = token.value.replace("!", "")
 
+            from pydbml.ast.nodes import VariableNode, IndexAccessNode, DotAccessNode
+
             node = VariableNode(name, is_global)
 
-            # ✅ THIS IS THE MISSING PIECE
-            while self._match("LBRACKET"):
-                self._consume()  # [
+            while True:
+            
+                # --------------------------
+                # Index access
+                # --------------------------
+                if self._match("LBRACKET"):
+                    self._consume()
+                    index_expr = self.expression()
+                    self._consume_expected("RBRACKET")
+                    node = IndexAccessNode(node, index_expr)
+                    continue
+                
+                # --------------------------
+                # Dot access
+                # --------------------------
+                if self._match("DOT"):
+                    self._consume()
+                    attr_token = self._consume()
 
-                index_expr = self.expression()
+                    if attr_token.type != "IDENTIFIER":
+                        raise SyntaxError("Expected attribute name after '.'")
 
-                self._consume_expected("RBRACKET")
-
-                from pydbml.ast.nodes import IndexAccessNode
-                node = IndexAccessNode(node, index_expr)
-
+                    node = DotAccessNode(node, attr_token.value)
+                    continue
+                
+                break
+            
             return node
     
         if token.type == "LPAREN":
@@ -291,3 +313,50 @@ class Parser:
         value = self.expression()
 
         return IndexAssignNode(target, index_expr, value)
+    
+    def _is_dot_assignment(self):
+        """
+        Detect pattern:
+        !x.name = ...
+        !x[1].name = ...
+        """
+
+        if self._peek().type not in ("LOCAL_VAR", "GLOBAL_VAR"):
+            return False
+
+        pos = self.pos
+
+        while pos < len(self.tokens):
+            t = self.tokens[pos]
+
+            # found a dot
+            if t.type == "DOT":
+                # ensure IDENTIFIER follows and then '='
+                if (
+                    pos + 2 < len(self.tokens)
+                    and self.tokens[pos + 1].type == "IDENTIFIER"
+                    and self.tokens[pos + 2].type == "EQUAL"
+                ):
+                    return True
+
+            # also handle nested cases like !x[1].name
+            if t.type == "EQUAL":
+                break
+
+            pos += 1
+
+        return False
+
+
+    def _parse_dot_assignment(self):
+        # parse full left-hand side (supports chaining)
+        target = self._parse_primary()
+
+        if not hasattr(target, "attribute"):
+            raise SyntaxError("Invalid dot assignment")
+
+        self._consume_expected("EQUAL")
+
+        value = self.expression()
+
+        return DotAssignNode(target.target, target.attribute, value)

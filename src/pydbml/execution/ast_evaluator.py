@@ -8,6 +8,8 @@ from pydbml.ast.nodes import (
     IndexAccessNode,
     IndexAssignNode,
     ObjectNode,
+    DotAccessNode, 
+    DotAssignNode,
 )
 
 from pydbml.utils.debug import debug
@@ -23,6 +25,32 @@ class ASTEvaluator:
 
         debug("NODE START", node)
 
+        if isinstance(node, DotAccessNode):
+            obj = self.evaluate(node.target)
+
+            debug("DOT ACCESS", f"{obj}.{node.attribute}")
+
+            if not hasattr(obj, "value") or not isinstance(obj.value, dict):
+                raise TypeError("Dot access only valid on object-like structures")
+
+            if node.attribute not in obj.value:
+                raise KeyError(f"Attribute '{node.attribute}' not found")
+
+            return obj.value[node.attribute]
+
+        if isinstance(node, DotAssignNode):
+            obj = self.evaluate(node.target)
+            value = self.evaluate(node.value)
+
+            debug("DOT ASSIGN", f"{node.attribute} = {value}")
+
+            if not hasattr(obj, "value") or not isinstance(obj.value, dict):
+                raise TypeError("Dot assignment only valid on object-like structures")
+
+            obj.value[node.attribute] = value
+
+            return f"{node.attribute} set"
+        
         # --------------------------
         # Object creation
         # --------------------------
