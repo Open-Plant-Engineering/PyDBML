@@ -63,6 +63,8 @@ class Resolver:
     def _resolve_variable(self, name: str):
         is_global = name.startswith("!!")
         clean = name.replace("!", "")
-
-        var = self.env.get(clean, is_global=is_global)
-        return var.get()
+    
+        if is_global:
+            return self.env.get_global(clean).get()
+    
+        return self.env.get(clean).get()

@@ -63,6 +63,7 @@ class Evaluator:
     # Lookup
     # --------------------------
     def _handle_lookup(self, code: str):
+
         # Array access
         if "[" in code and "]" in code:
             return self._handle_array_access(code)
@@ -70,7 +71,11 @@ class Evaluator:
         is_global = code.startswith("!!")
         name = code.replace("!", "")
 
-        var = self.env.get(name, is_global=is_global)
+        if is_global:
+            var = self.env.get_global(name)
+        else:
+            var = self.env.get(name)
+
         return var.get()
 
     # --------------------------

@@ -17,7 +17,7 @@ def test_global_variable():
 
     env.set("x", String("Global Tommy"), is_global=True)
 
-    var = env.get("x", is_global=True)
+    var = env.get_global("x")
     assert var.get().value == "Global Tommy"
 
 
