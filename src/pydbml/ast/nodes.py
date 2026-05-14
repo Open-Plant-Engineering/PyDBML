@@ -56,3 +56,17 @@ class IfNode(ASTNode):
         self.condition = condition
         self.then_branch = then_branch
         self.else_branch = else_branch
+
+# --------------------------
+# Logical Operations
+# --------------------------
+class LogicalOpNode(ASTNode):
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+
+class NotNode(ASTNode):
+    def __init__(self, operand):
+        self.operand = operand
+

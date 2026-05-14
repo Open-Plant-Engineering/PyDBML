@@ -54,7 +54,7 @@ class Parser:
         if self._match("IF"):
             return self._parse_if()
 
-        return self._parse_comparison()
+        return self._parse_or()
 
     def _parse_comparison(self):
         node = self._parse_term()
@@ -166,3 +166,33 @@ class Parser:
             else_branch = self.expression()
     
         return IfNode(condition, then_branch, else_branch)
+
+    def _parse_or(self):
+        node = self._parse_and()
+
+        while self._match("OR"):
+            self._consume()
+            right = self._parse_and()
+            from pydbml.ast.nodes import LogicalOpNode
+            node = LogicalOpNode(node, "OR", right)
+
+        return node
+
+    def _parse_and(self):
+        node = self._parse_not()
+
+        while self._match("AND"):
+            self._consume()
+            right = self._parse_not()
+            from pydbml.ast.nodes import LogicalOpNode
+            node = LogicalOpNode(node, "AND", right)
+
+        return node
+
+    def _parse_not(self):
+        if self._match("NOT"):
+            self._consume()
+            from pydbml.ast.nodes import NotNode
+            return NotNode(self._parse_not())
+
+        return self._parse_comparison()

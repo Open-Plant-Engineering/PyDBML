@@ -1,5 +1,5 @@
 from pydbml.types.primitives import Number, String, Boolean
-from pydbml.ast.nodes import IfNode
+from pydbml.ast.nodes import IfNode, LogicalOpNode, NotNode
 
 class ASTEvaluator:
     def __init__(self, env):
@@ -9,6 +9,33 @@ class ASTEvaluator:
         if node is None:
             return None
         
+        # --------------------------
+        # NOT
+        # --------------------------
+        if isinstance(node, NotNode):
+            value = self.evaluate(node.operand)
+
+            if not isinstance(value, Boolean):
+                raise TypeError("NOT requires BOOLEAN value")
+
+            return Boolean(not value.value)
+        
+        # --------------------------
+        # Logical AND / OR
+        # --------------------------
+        if isinstance(node, LogicalOpNode):
+            left = self.evaluate(node.left)
+            right = self.evaluate(node.right)
+
+            if not isinstance(left, Boolean) or not isinstance(right, Boolean):
+                raise TypeError("Logical operations require BOOLEAN values")
+
+            if node.op == "AND":
+                return Boolean(left.value and right.value)
+
+            if node.op == "OR":
+                return Boolean(left.value or right.value)
+            
         # --------------------------
         # IF Node
         # --------------------------

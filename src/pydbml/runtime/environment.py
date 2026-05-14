@@ -16,6 +16,7 @@ class Environment:
     # Set Variable
     # --------------------------
     def set(self, name: str, value: PyDBMLType, is_global: bool = False):
+        name = name.lower()
         var = Variable(name, value, is_global)
 
         if is_global:
@@ -32,7 +33,7 @@ class Environment:
         1. Local
         2. Global
         """
-
+        name = name.lower()
         if name in self._local:
             return self._local[name]
 
@@ -45,6 +46,7 @@ class Environment:
     # Explicit Global Access
     # --------------------------
     def get_global(self, name: str) -> Variable:
+        name = name.lower()
         if name not in self._global:
             raise KeyError(f"Global variable '{name}' not found")
 
