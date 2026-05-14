@@ -1,6 +1,6 @@
 from pydbml.runtime.environment import Environment
 from pydbml.execution.resolver import Resolver
-
+from pydbml.expression.evaluator import ExpressionEvaluator
 
 class Evaluator:
     """
@@ -10,6 +10,7 @@ class Evaluator:
     def __init__(self):
         self.env = Environment()
         self.resolver = Resolver(self.env)
+        self.expr_evaluator = ExpressionEvaluator(self.resolver)
 
     def evaluate(self, code: str):
         code = code.strip()
@@ -34,7 +35,7 @@ class Evaluator:
         is_global = lhs.startswith("!!")
         name = lhs.replace("!", "")
 
-        value = self.resolver.resolve(rhs)
+        value = self.expr_evaluator.evaluate(rhs)
 
         self.env.set(name, value, is_global=is_global)
 
@@ -53,7 +54,7 @@ class Evaluator:
         var = self.env.get(name, is_global=is_global)
         array_obj = var.get()
 
-        value = self.resolver.resolve(rhs)
+        value = self.expr_evaluator.evaluate(rhs)
 
         array_obj.set(index, value)
 
