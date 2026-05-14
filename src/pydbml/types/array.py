@@ -10,11 +10,21 @@ class Array(PyDBMLType):
             raise TypeError("Array must be dict-based")
 
     def set(self, index: int, item: PyDBMLType):
+        if not isinstance(index, int):
+            raise TypeError("Array index must be integer")
+
         if index < 1:
             raise ValueError("Array index starts from 1")
+
+        if not isinstance(item, PyDBMLType):
+            raise TypeError("Array value must be PyDBMLType")
+
         self.value[index] = item
 
     def get(self, index: int):
+        if index not in self.value:
+            raise KeyError(f"Index {index} not set")
+
         return self.value.get(index)
 
 

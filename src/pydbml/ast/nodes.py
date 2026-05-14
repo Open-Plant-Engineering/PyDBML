@@ -70,3 +70,27 @@ class NotNode(ASTNode):
     def __init__(self, operand):
         self.operand = operand
 
+# --------------------------
+# Array Access
+# --------------------------
+class IndexAccessNode(ASTNode):
+    def __init__(self, target, index):
+        self.target = target
+        self.index = index
+
+
+# --------------------------
+# Array Assignment
+# --------------------------
+class IndexAssignNode(ASTNode):
+    def __init__(self, target, index, value):
+        self.target = target
+        self.index = index
+        self.value = value
+
+# --------------------------
+# Object Creation
+# --------------------------
+class ObjectNode(ASTNode):
+    def __init__(self, type_name):
+        self.type_name = type_name

@@ -7,6 +7,7 @@ from pydbml.ast.nodes import (
     AssignNode,
     BinaryOpNode,
     IfNode,
+    IndexAccessNode,
 )
 
 
@@ -98,12 +99,21 @@ class Parser:
     def _parse_primary(self):
         token = self._consume()
 
+        # --------------------------
+        # Boolean
+        # --------------------------
         if token.type == "BOOLEAN":
             return BooleanNode(token.value.lower() == "true")
 
+        # --------------------------
+        # Number
+        # --------------------------
         if token.type == "NUMBER":
             return NumberNode(float(token.value))
 
+        # --------------------------
+        # String
+        # --------------------------
         if token.type == "STRING":
             return StringNode(token.value.strip("'"))
 

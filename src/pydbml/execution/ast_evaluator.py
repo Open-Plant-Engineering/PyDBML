@@ -1,5 +1,7 @@
 from pydbml.types.primitives import Number, String, Boolean
-from pydbml.ast.nodes import IfNode, LogicalOpNode, NotNode
+from pydbml.ast.nodes import IfNode, LogicalOpNode, NotNode, IndexAccessNode, IndexAssignNode, ObjectNode
+from pydbml.types.array import Array
+
 
 class ASTEvaluator:
     def __init__(self, env):
