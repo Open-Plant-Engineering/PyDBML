@@ -33,3 +33,13 @@ def test_boolean_assignment():
     result = engine.execute("!flag")
 
     assert result.value is True
+
+def test_variable_reference():
+    engine = Engine()
+
+    engine.execute("!x = 10")
+    engine.execute("!y = !x")
+
+    result = engine.execute("!y")
+
+    assert result.value == 10
