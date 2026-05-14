@@ -6,6 +6,7 @@ from pydbml.ast.nodes import (
     VariableNode,
     AssignNode,
     BinaryOpNode,
+    IfNode,
 )
 
 
@@ -50,6 +51,9 @@ class Parser:
     # Expression (precedence)
     # --------------------------
     def expression(self):
+        if self._match("IF"):
+            return self._parse_if()
+
         return self._parse_comparison()
 
     def _parse_comparison(self):
@@ -95,7 +99,7 @@ class Parser:
         token = self._consume()
 
         if token.type == "BOOLEAN":
-            return BooleanNode(token.value.lower())
+            return BooleanNode(token.value.lower() == "true")
 
         if token.type == "NUMBER":
             return NumberNode(float(token.value))
@@ -141,3 +145,24 @@ class Parser:
         if self.pos < len(self.tokens) and self.tokens[self.pos].type in types:
             return True
         return False
+    
+    def _parse_if(self):
+        """
+        IF condition THEN expr ELSE expr
+        """
+    
+        self._consume_expected("IF")
+    
+        condition = self.expression()
+    
+        self._consume_expected("THEN")
+    
+        then_branch = self.expression()
+    
+        else_branch = None
+    
+        if self._match("ELSE"):
+            self._consume()  # consume ELSE
+            else_branch = self.expression()
+    
+        return IfNode(condition, then_branch, else_branch)

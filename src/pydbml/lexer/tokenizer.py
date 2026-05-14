@@ -6,9 +6,6 @@ TOKEN_SPEC = [
     ("NUMBER", r"\d+(\.\d+)?"),
     ("STRING", r"'[^']*'"),
 
-    # ✅ Boolean keywords
-    ("BOOLEAN", r"\btrue\b|\bfalse\b"),
-
     # ✅ Multi-character operators FIRST
     ("EQ", r"=="),
     ("NE", r"!="),
@@ -31,9 +28,14 @@ TOKEN_SPEC = [
     ("RPAREN", r"\)"),
     ("EQUAL", r"="),
 
-    ("IDENTIFIER", r"[a-zA-Z_]\w*"),
-
     ("SKIP", r"[ \t]+"),
+
+    ("IF", r"\b(IF|if)\b"),
+    ("THEN", r"\b(THEN|then)\b"),
+    ("ELSE", r"\b(ELSE|else)\b"),
+    # ✅ Boolean keywords
+    ("BOOLEAN", r"\btrue\b|\bfalse\b"),
+    ("IDENTIFIER", r"[a-zA-Z_]\w*"),
 ]
 
 
