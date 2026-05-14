@@ -15,10 +15,10 @@ class Evaluator:
     def evaluate(self, code: str):
         code = code.strip()
 
-        if "=" in code:
+        if self._is_assignment(code):
             return self._handle_assignment(code)
 
-        return self._handle_lookup(code)
+        return self.expr_evaluator.evaluate(code)
 
     # --------------------------
     # Assignment
@@ -61,25 +61,6 @@ class Evaluator:
         return f"{name}[{index}] set"
 
     # --------------------------
-    # Lookup
-    # --------------------------
-    def _handle_lookup(self, code: str):
-
-        # Array access
-        if "[" in code and "]" in code:
-            return self._handle_array_access(code)
-
-        is_global = code.startswith("!!")
-        name = code.replace("!", "")
-
-        if is_global:
-            var = self.env.get_global(name)
-        else:
-            var = self.env.get(name)
-
-        return var.get()
-
-    # --------------------------
     # Array Access
     # --------------------------
     def _handle_array_access(self, code: str):
@@ -93,3 +74,9 @@ class Evaluator:
         array_obj = var.get()
 
         return array_obj.get(index)
+    
+    def _is_assignment(self, code: str) -> bool:
+        """
+        Detect real assignment (= but not ==, >=, <=, !=)
+        """
+        return "=" in code and not any(op in code for op in ["==", ">=", "<=", "!="])

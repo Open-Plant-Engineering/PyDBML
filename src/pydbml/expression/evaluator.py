@@ -1,5 +1,6 @@
-from pydbml.types.primitives import Number, String
+from pydbml.types.primitives import Number, String, Boolean
 
+COMPARISON_OPS = [">=", "<=", "==", "!=", ">", "<"]
 
 class ExpressionEvaluator:
     """
@@ -15,6 +16,19 @@ class ExpressionEvaluator:
         # Handle parentheses first
         if self._is_wrapped(expr):
             return self.evaluate(expr[1:-1].strip())
+        
+        # 0️⃣ Comparison operators (highest priority for splitting)
+        for op in COMPARISON_OPS:
+            index = self._find_operator(expr, op)
+
+            if index != -1:
+                left = expr[:index]
+                right = expr[index + len(op):]
+
+                left_val = self.evaluate(left)
+                right_val = self.evaluate(right)
+
+                return self._apply_comparison(left_val, right_val, op)
 
         # 1️⃣ LOW precedence (right split) → + -
         for op in ["+", "-"]:
@@ -45,22 +59,25 @@ class ExpressionEvaluator:
 
     def _find_operator(self, expr: str, operator: str) -> int:
         """
-        Find operator position, ignoring parentheses.
-        Right-to-left scan ensures correct grouping.
+        Find operator position (supports multi-char operators),
+        ignoring parentheses.
         """
-
+    
         depth = 0
-
-        for i in range(len(expr) - 1, -1, -1):
+        op_len = len(operator)
+    
+        for i in range(len(expr) - op_len, -1, -1):
             char = expr[i]
-
+    
             if char == ")":
                 depth += 1
             elif char == "(":
                 depth -= 1
-            elif char == operator and depth == 0:
+    
+            # Only match if at correct depth
+            if depth == 0 and expr[i : i + op_len] == operator:
                 return i
-
+    
         return -1
 
     def _apply_operator(self, left, right, op):
@@ -104,4 +121,22 @@ class ExpressionEvaluator:
                 return False
     
         return True
-    
+    def _apply_comparison(self, left, right, op):
+        left_val = left.value
+        right_val = right.value
+
+        if op == ">":
+            return Boolean(left_val > right_val)
+        elif op == "<":
+            return Boolean(left_val < right_val)
+        elif op == ">=":
+            return Boolean(left_val >= right_val)
+        elif op == "<=":
+            return Boolean(left_val <= right_val)
+        elif op == "==":
+            return Boolean(left_val == right_val)
+        elif op == "!=":
+            return Boolean(left_val != right_val)
+
+        raise TypeError(f"Unsupported comparison: {left} {op} {right}")
+
