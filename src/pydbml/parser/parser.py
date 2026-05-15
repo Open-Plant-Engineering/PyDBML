@@ -168,7 +168,7 @@ class Parser:
                     self._consume()
                     attr_token = self._consume()
 
-                    if attr_token.type != "IDENTIFIER":
+                    if attr_token.type not in ("IDENTIFIER", "AND", "OR", "NOT"):
                         raise SyntaxError("Expected attribute name after '.'")
 
                     method_name = attr_token.value
