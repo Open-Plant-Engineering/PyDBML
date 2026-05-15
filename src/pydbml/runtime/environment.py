@@ -63,11 +63,12 @@ class Environment:
         name = name.lower()
 
         # ✅ search from inner → outer
-        for scope in reversed(self._local_stack):
-            if name in scope:
-                del scope[name]
-                debug("ENV DELETE", f"{name} removed from local scope")
-                return
+        # for scope in reversed(self._local_stack):
+        # currently we are just deleting from current scope
+        if name in self._local_stack[-1]:
+            del self._local_stack[-1][name]
+            debug("ENV DELETE", f"{name} removed from local scope")
+            return
 
         # ✅ fallback: global
         if name in self._global:
