@@ -52,6 +52,10 @@ class ASTEvaluator:
             loader = FunctionLoader(self.resolver)
             func_ast = loader.load(node.name)
         
+            # ✅ safety check
+            if not isinstance(func_ast, FunctionDefNode):
+                raise Exception(f"{node.name} is not a valid function definition")
+        
             # evaluate arguments
             arg_values = [self.evaluate(arg) for arg in node.args]
         
