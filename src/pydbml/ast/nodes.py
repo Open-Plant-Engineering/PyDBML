@@ -105,3 +105,9 @@ class DotAssignNode(ASTNode):
         self.target = target
         self.attribute = attribute
         self.value = value
+
+class CallNode(ASTNode):
+    def __init__(self, target, method, args):
+        self.target = target
+        self.method = method
+        self.args = args

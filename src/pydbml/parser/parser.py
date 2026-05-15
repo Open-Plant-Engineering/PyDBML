@@ -171,11 +171,30 @@ class Parser:
                     if attr_token.type != "IDENTIFIER":
                         raise SyntaxError("Expected attribute name after '.'")
 
-                    node = DotAccessNode(node, attr_token.value)
+                    method_name = attr_token.value
+
+                    # ✅ method call
+                    if self._match("LPAREN"):
+                        self._consume()  # (
+
+                        args = []
+
+                        if not self._match("RPAREN"):
+                            args.append(self.expression())
+
+                            while self._match("COMMA"):
+                                self._consume()
+                                args.append(self.expression())
+
+                        self._consume_expected("RPAREN")
+
+                        from pydbml.ast.nodes import CallNode
+                        node = CallNode(node, method_name, args)
+
+                    else:
+                        node = DotAccessNode(node, method_name)
                     continue
-                
                 break
-            
             return node
     
         if token.type == "LPAREN":

@@ -10,6 +10,7 @@ from pydbml.ast.nodes import (
     ObjectNode,
     DotAccessNode, 
     DotAssignNode,
+    CallNode,
 )
 
 from pydbml.utils.debug import debug
@@ -25,6 +26,50 @@ class ASTEvaluator:
 
         debug("NODE START", node)
 
+        if isinstance(node, CallNode):
+        
+            target = self.evaluate(node.target)
+            args = [self.evaluate(arg) for arg in node.args]
+
+            method = node.method.upper()
+
+            debug("CALL", f"{method} with args {args}")
+
+            # --------------------------
+            # Comparison Methods
+            # --------------------------
+            if method == "EQ":
+                return Boolean(target.value == args[0].value)
+
+            if method == "NEQ":
+                return Boolean(target.value != args[0].value)
+
+            if method == "GT":
+                return Boolean(target.value > args[0].value)
+
+            if method == "LT":
+                return Boolean(target.value < args[0].value)
+
+            if method == "GEQ":
+                return Boolean(target.value >= args[0].value)
+
+            if method == "LEQ":
+                return Boolean(target.value <= args[0].value)
+
+            # --------------------------
+            # Logical
+            # --------------------------
+            if method == "AND":
+                return Boolean(target.value and args[0].value)
+
+            if method == "OR":
+                return Boolean(target.value or args[0].value)
+
+            if method == "NOT":
+                return Boolean(not target.value)
+
+            raise Exception(f"Unknown method: {method}")
+        
         if isinstance(node, DotAccessNode):
             obj = self.evaluate(node.target)
 
