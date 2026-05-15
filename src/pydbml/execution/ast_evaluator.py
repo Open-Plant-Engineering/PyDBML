@@ -2,6 +2,7 @@ from pydbml.types.primitives import Number, String, Boolean
 from pydbml.types.array import Array
 from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
+from pydbml.execution.return_signal import ReturnSignal
 from pydbml.ast.nodes import (
     IfNode,
     LogicalOpNode,
@@ -13,6 +14,8 @@ from pydbml.ast.nodes import (
     DotAssignNode,
     CallNode,
     FunctionCallNode,
+    FunctionDefNode, 
+    ReturnNode,
 )
 
 from pydbml.utils.debug import debug
@@ -29,6 +32,21 @@ class ASTEvaluator:
 
         debug("NODE START", node)
 
+        if isinstance(node, ReturnNode):
+            value = self.evaluate(node.value)
+            # special signal for return
+            raise ReturnSignal(value)
+        
+        if isinstance(node, FunctionDefNode):
+            # return last return value found
+            try:
+                result = None
+                for stmt in node.body:
+                    result = self.evaluate(stmt)
+                return result
+            except ReturnSignal as r:
+                return r.value
+            
         if isinstance(node, FunctionCallNode):
             debug("FUNCTION CALL", node.name)    
             if not hasattr(self, "resolver"):

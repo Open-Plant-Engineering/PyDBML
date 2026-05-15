@@ -6,6 +6,12 @@ TOKEN_SPEC = [
     ("NUMBER", r"\d+(\.\d+)?"),
     ("STRING", r"'[^']*'"),
 
+    ("DEFINE", r"\b(DEFINE|define)\b"),
+    ("FUNCTION", r"\b(FUNCTION|function)\b"),
+    ("ENDFUNCTION", r"\b(ENDFUNCTION|endfunction)\b"),
+    ("RETURN", r"\b(RETURN|return)\b"),
+    ("IS", r"\b(IS|is)\b"),
+
     # Keywords (case-insensitive handled later)
     ("IF", r"\b(IF|if)\b"),
     ("THEN", r"\b(THEN|then)\b"),

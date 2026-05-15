@@ -13,6 +13,8 @@ from pydbml.ast.nodes import (
     IndexAccessNode, 
     DotAccessNode,
     FunctionCallNode,
+    FunctionDefNode,
+    ReturnNode,
 )
 
 
@@ -31,6 +33,11 @@ class Parser:
     # Statement
     # --------------------------
     def statement(self):
+
+        if self._match("DEFINE"):
+            return self._parse_function_def()
+        if self._match("RETURN"):
+            return self._parse_return()
 
         # ✅ DOT assignment FIRST (highest priority)
         if self._peek().type in ("LOCAL_VAR", "GLOBAL_VAR"):
@@ -407,3 +414,37 @@ class Parser:
         value = self.expression()
 
         return DotAssignNode(target.target, target.attribute, value)
+    
+    def _parse_function_def(self):
+        self._consume_expected("DEFINE")
+        self._consume_expected("FUNCTION")
+
+        name_token = self._consume()
+
+        if name_token.type != "GLOBAL_VAR":
+            raise SyntaxError("Function name must be global (use !!)")
+
+        func_name = name_token.value.replace("!", "")
+
+        # parse ()
+        self._consume_expected("LPAREN")
+        self._consume_expected("RPAREN")
+
+        # optional "IS TYPE"
+        if self._match("IS"):
+            self._consume()  # skip IS
+            self._consume()  # skip type
+
+        # parse body
+        body = []
+
+        while not self._match("ENDFUNCTION"):
+            body.append(self.statement())
+
+        self._consume_expected("ENDFUNCTION")
+        return FunctionDefNode(func_name, body)
+    
+    def _parse_return(self):
+        self._consume_expected("RETURN")
+        value = self.expression()
+        return ReturnNode(value)
