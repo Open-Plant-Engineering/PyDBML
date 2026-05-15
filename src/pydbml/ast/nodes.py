@@ -111,3 +111,8 @@ class CallNode(ASTNode):
         self.target = target
         self.method = method
         self.args = args
+
+class FunctionCallNode(ASTNode):
+    def __init__(self, name, args):
+        self.name = name
+        self.args = args

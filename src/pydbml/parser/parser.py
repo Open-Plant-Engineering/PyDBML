@@ -10,6 +10,9 @@ from pydbml.ast.nodes import (
     IndexAssignNode,
     DotAssignNode,
     CallNode,
+    IndexAccessNode, 
+    DotAccessNode,
+    FunctionCallNode,
 )
 
 
@@ -156,7 +159,20 @@ class Parser:
             is_global = token.type == "GLOBAL_VAR"
             name = token.value.replace("!", "")
 
-            from pydbml.ast.nodes import VariableNode, IndexAccessNode, DotAccessNode
+            if token.type == "GLOBAL_VAR" and self._match("LPAREN"):
+                self._consume()  # (
+                args = []
+                if not self._match("RPAREN"):
+                    args.append(self.expression())
+
+                    while self._match("COMMA"):
+                        self._consume()
+                        args.append(self.expression())
+
+                self._consume_expected("RPAREN")
+
+                # ✅ IMPORTANT: use dedicated node
+                return FunctionCallNode(name, args)
 
             node = VariableNode(name, is_global)
 

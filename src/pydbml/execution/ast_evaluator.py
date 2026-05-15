@@ -1,6 +1,7 @@
 from pydbml.types.primitives import Number, String, Boolean
 from pydbml.types.array import Array
 from pydbml.runtime.methods import MethodRegistry
+from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.ast.nodes import (
     IfNode,
     LogicalOpNode,
@@ -11,20 +12,31 @@ from pydbml.ast.nodes import (
     DotAccessNode, 
     DotAssignNode,
     CallNode,
+    FunctionCallNode,
 )
 
 from pydbml.utils.debug import debug
 
 
 class ASTEvaluator:
-    def __init__(self, env):
+    def __init__(self, env, resolver=None):
         self.env = env
+        self.resolver = resolver
 
     def evaluate(self, node):
         if node is None:
             return None
 
         debug("NODE START", node)
+
+        if isinstance(node, FunctionCallNode):
+            debug("FUNCTION CALL", node.name)    
+            if not hasattr(self, "resolver"):
+                raise Exception("Resolver not initialized in evaluator")
+
+            loader = FunctionLoader(self.resolver)
+            func_ast = loader.load(node.name)
+            return self.evaluate(func_ast)
 
         if isinstance(node, CallNode):
             target = self.evaluate(node.target)

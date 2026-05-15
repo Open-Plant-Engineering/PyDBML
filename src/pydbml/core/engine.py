@@ -2,6 +2,8 @@ from pydbml.execution.ast_evaluator import ASTEvaluator
 from pydbml.parser.parser import Parser
 from pydbml.runtime.environment import Environment
 from pydbml.utils.debug import debug
+from pydbml.runtime.config import RuntimeConfig
+from pydbml.runtime.resolver import ResourceResolver
 
 
 class Engine:
@@ -12,7 +14,9 @@ class Engine:
 
     def __init__(self):
         self.env = Environment()
-        self.evaluator = ASTEvaluator(self.env)
+        self.config = RuntimeConfig()
+        self.resolver = ResourceResolver(self.config)
+        self.evaluator = ASTEvaluator(self.env, self.resolver)
 
     def execute(self, code: str):
         """
