@@ -2,6 +2,7 @@ from pydbml.types.primitives import Number, String, Boolean
 from pydbml.types.array import Array
 from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
+from pydbml.runtime.type_system import check_type
 from pydbml.execution.return_signal import ReturnSignal
 from pydbml.ast.nodes import (
     IfNode,
@@ -51,45 +52,66 @@ class ASTEvaluator:
         
             loader = FunctionLoader(self.resolver)
             func_ast = loader.load(node.name)
-        
-            # ✅ safety check
+
+            # ✅ Validate function structure
             if not isinstance(func_ast, FunctionDefNode):
-                raise Exception(f"{node.name} is not a valid function definition")
-        
-            # evaluate arguments
+                raise Exception(f"{node.name} is not a valid function")
+
+            # --------------------------
+            # Evaluate arguments
+            # --------------------------
             arg_values = [self.evaluate(arg) for arg in node.args]
-        
+
+            # --------------------------
+            # Argument count validation
+            # --------------------------
             if len(arg_values) != len(func_ast.params):
-                raise Exception("Argument count mismatch")
-        
-            # ✅ create new local scope
-            old_env = self.env._local.copy()
-        
+                raise Exception(
+                    f"{node.name} expects {len(func_ast.params)} args, got {len(arg_values)}"
+                )
+
+            # --------------------------
+            # Create new scope
+            # --------------------------
+            old_scope = self.env._local.copy()
+
             try:
-                # bind params
+                # --------------------------
+                # Bind parameters with type enforcement
+                # --------------------------
                 for (param_name, param_type), value in zip(func_ast.params, arg_values):
                 
-                    # 🔥 basic type enforcement
-                    if param_type == "REAL" and not hasattr(value, "value"):
-                        raise TypeError(f"{param_name} must be REAL")
-        
+                    if not check_type(value, param_type):
+                        raise TypeError(
+                            f"Parameter '{param_name}' must be {param_type}, got {type(value).__name__}"
+                        )
+
                     self.env.set(param_name, value, is_global=False)
-        
-                # execute body
+
+                # --------------------------
+                # Execute function body
+                # --------------------------
                 result = None
-        
+
                 for stmt in func_ast.body:
                     result = self.evaluate(stmt)
-        
+
                 return result
-        
+
             except ReturnSignal as r:
-                # ✅ type check return
+            
+                # ✅ RETURN TYPE VALIDATION
+                if not check_type(r.value, func_ast.return_type):
+                    raise TypeError(
+                        f"Function '{node.name}' must return {func_ast.return_type}"
+                    )
+
                 return r.value
         
             finally:
-                # restore environment
-                self.env._local = old_env
+                # ✅ restore scope
+                self.env._local = old_scope
+
 
         if isinstance(node, CallNode):
             target = self.evaluate(node.target)
