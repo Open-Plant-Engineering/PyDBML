@@ -17,6 +17,16 @@ TOKEN_SPEC = [
 
     ("BOOLEAN", r"\b(true|false)\b"),
 
+    # --------------------------
+    # PML1 Comparison keywords
+    # --------------------------
+    ("EQ_KW", r"\b(EQ|eq)\b"),
+    ("NEQ_KW", r"\b(NEQ|neq)\b"),
+    ("LT_KW", r"\b(LT|lt)\b"),
+    ("GT_KW", r"\b(GT|gt)\b"),
+    ("LE_KW", r"\b(LE|le)\b"),
+    ("GE_KW", r"\b(GE|ge)\b"),
+
     # Multi-char operators
     ("EQ", r"=="),
     ("NE", r"!="),

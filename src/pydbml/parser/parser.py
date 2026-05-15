@@ -69,7 +69,9 @@ class Parser:
     def _parse_comparison(self):
         node = self._parse_term()
 
-        while self._match("EQ", "NE", "GT", "LT", "GE", "LE"):
+        while self._match( "EQ", "NE", "GT", "LT", "GE", "LE",
+            "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
+        ):
             op_token = self._consume()
             op_map = {
                 "EQ": "==",
@@ -78,6 +80,14 @@ class Parser:
                 "LT": "<",
                 "GE": ">=",
                 "LE": "<=",
+                
+                # PML1 keywords ✅
+                "EQ_KW": "==",
+                "NEQ_KW": "!=",
+                "GT_KW": ">",
+                "LT_KW": "<",
+                "GE_KW": ">=",
+                "LE_KW": "<=",
             }
             op = op_map[op_token.type]
             right = self._parse_term()
@@ -163,16 +173,20 @@ class Parser:
                     continue
                 
                 # --------------------------
-                # Dot access
+                # Dot access / method call
                 # --------------------------
                 if self._match("DOT"):
                     self._consume()
                     attr_token = self._consume()
-
-                    if attr_token.type not in ("IDENTIFIER", "AND", "OR", "NOT"):
-                        raise SyntaxError("Expected attribute name after '.'")
-
                     method_name = attr_token.value
+
+                    # ✅ allow identifiers + all keyword-based methods
+                    if attr_token.type not in (
+                        "IDENTIFIER",
+                        "AND", "OR", "NOT",
+                        "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
+                    ):
+                        raise SyntaxError("Expected attribute name after '.'")
 
                     # ✅ method call
                     if self._match("LPAREN"):
