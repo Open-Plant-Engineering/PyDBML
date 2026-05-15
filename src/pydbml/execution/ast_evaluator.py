@@ -1,5 +1,6 @@
 from pydbml.types.primitives import Number, String, Boolean
 from pydbml.types.array import Array
+from pydbml.types.object import ObjectInstance
 from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
@@ -32,6 +33,24 @@ class ASTEvaluator:
             return None
 
         debug("NODE START", node)
+
+        if isinstance(node, ObjectNode):
+        
+            if node.type_name == "array":
+                return Array()
+
+            if node.type_name.lower() != "object":
+                # load custom object
+                loader = ObjectLoader(self.resolver)
+                obj_def = loader.load(node.type_name)
+
+                instance = ObjectInstance(obj_def)
+
+                # ✅ call constructor if exists
+                if node.type_name in obj_def.methods:
+                    self._execute_method(instance, obj_def.methods[node.type_name], [])
+
+                return instance
 
         if isinstance(node, ReturnNode):
             value = self.evaluate(node.value)
@@ -104,36 +123,80 @@ class ASTEvaluator:
 
 
         if isinstance(node, CallNode):
+        
             target = self.evaluate(node.target)
             args = [self.evaluate(arg) for arg in node.args]
-            debug("CALL", f"{node.method} on {target} with args {args}")
-            return MethodRegistry.call(node.method, target, args)
+
+            # --------------------------
+            # Case 1: Object method
+            # --------------------------
+            if isinstance(target, tuple) and target[0] == "__method__":
+                _, obj, method_name = target
+
+                method = obj.definition.methods[method_name]
+
+                return self._execute_method(obj, method, args)
+
+            # --------------------------
+            # Case 2: Generic methods (PML2)
+            # --------------------------
+            if hasattr(node, "method"):
+                method = node.method.upper()
+
+                return MethodRegistry.call(method, target, args)
+
+            # --------------------------
+            # Fallback
+            # --------------------------
+            raise Exception(f"Unsupported CallNode: {node}")
         
+        # --------------------------
+        # DOT ACCESS
+        # --------------------------
         if isinstance(node, DotAccessNode):
             obj = self.evaluate(node.target)
 
             debug("DOT ACCESS", f"{obj}.{node.attribute}")
 
-            if not hasattr(obj, "value") or not isinstance(obj.value, dict):
-                raise TypeError("Dot access only valid on object-like structures")
+            # ✅ ObjectInstance
+            if isinstance(obj, ObjectInstance):
+            
+                if node.attribute in obj.value:
+                    return obj.value[node.attribute]
 
-            if node.attribute not in obj.value:
+                if node.attribute in obj.definition.methods:
+                    return ("__method__", obj, node.attribute)
+
                 raise KeyError(f"Attribute '{node.attribute}' not found")
 
-            return obj.value[node.attribute]
+            # ✅ Primitive / Array support (fallback)
+            if hasattr(obj, "value"):
+            
+                if isinstance(obj.value, dict) and node.attribute in obj.value:
+                    return obj.value[node.attribute]
 
+            raise TypeError("Dot access not supported for this type")
+
+        # --------------------------
+        # DOT ASSIGN
+        # --------------------------
         if isinstance(node, DotAssignNode):
             obj = self.evaluate(node.target)
             value = self.evaluate(node.value)
-
+        
             debug("DOT ASSIGN", f"{node.attribute} = {value}")
-
-            if not hasattr(obj, "value") or not isinstance(obj.value, dict):
-                raise TypeError("Dot assignment only valid on object-like structures")
-
-            obj.value[node.attribute] = value
-
-            return f"{node.attribute} set"
+        
+            # ✅ ObjectInstance
+            if isinstance(obj, ObjectInstance):
+                obj.value[node.attribute] = value
+                return value
+        
+            # ✅ primitive dict fallback (old behavior)
+            if hasattr(obj, "value") and isinstance(obj.value, dict):
+                obj.value[node.attribute] = value
+                return value
+        
+            raise TypeError("Dot assignment not supported for this type")
         
         # --------------------------
         # Object creation
@@ -338,3 +401,19 @@ class ASTEvaluator:
                 return Boolean(left.value <= right.value)
 
         raise Exception(f"Unsupported AST node: {node}")
+    
+    def _execute_method(self, instance, method_node, args):
+
+        self.env.push_scope()
+
+        try:
+            # bind THIS
+            self.env.set("this", instance, is_global=False)
+
+            for stmt in method_node.body:
+                result = self.evaluate(stmt)
+
+            return result
+
+        finally:
+            self.env.pop_scope()

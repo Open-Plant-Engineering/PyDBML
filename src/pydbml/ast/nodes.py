@@ -127,3 +127,14 @@ class FunctionDefNode(ASTNode):
 class ReturnNode(ASTNode):
     def __init__(self, value):
         self.value = value
+
+class ObjectDefNode(ASTNode):
+    def __init__(self, name, members, methods):
+        self.name = name
+        self.members = members    # dict {name: type}
+        self.methods = methods    # dict {name: method AST}
+
+class MethodDefNode(ASTNode):
+    def __init__(self, name, body):
+        self.name = name
+        self.body = body
