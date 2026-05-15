@@ -8,7 +8,11 @@ def test_external_function(tmp_path):
     lib.mkdir()
 
     # ✅ create function file
-    (lib / "HELLO.pdfnc").write_text("1 + 2")
+    (lib / "HELLO.pdfnc").write_text("""
+    define function !!HELLO() is REAL
+        return 1 + 2
+    endfunction
+    """)
 
     # ✅ create index.txt (NEW FORMAT ✅)
     (lib / "index.txt").write_text("HELLO.pdfnc\n")

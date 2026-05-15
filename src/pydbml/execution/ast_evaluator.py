@@ -48,13 +48,44 @@ class ASTEvaluator:
                 return r.value
             
         if isinstance(node, FunctionCallNode):
-            debug("FUNCTION CALL", node.name)    
-            if not hasattr(self, "resolver"):
-                raise Exception("Resolver not initialized in evaluator")
-
+        
             loader = FunctionLoader(self.resolver)
             func_ast = loader.load(node.name)
-            return self.evaluate(func_ast)
+        
+            # evaluate arguments
+            arg_values = [self.evaluate(arg) for arg in node.args]
+        
+            if len(arg_values) != len(func_ast.params):
+                raise Exception("Argument count mismatch")
+        
+            # ✅ create new local scope
+            old_env = self.env._local.copy()
+        
+            try:
+                # bind params
+                for (param_name, param_type), value in zip(func_ast.params, arg_values):
+                
+                    # 🔥 basic type enforcement
+                    if param_type == "REAL" and not hasattr(value, "value"):
+                        raise TypeError(f"{param_name} must be REAL")
+        
+                    self.env.set(param_name, value, is_global=False)
+        
+                # execute body
+                result = None
+        
+                for stmt in func_ast.body:
+                    result = self.evaluate(stmt)
+        
+                return result
+        
+            except ReturnSignal as r:
+                # ✅ type check return
+                return r.value
+        
+            finally:
+                # restore environment
+                self.env._local = old_env
 
         if isinstance(node, CallNode):
             target = self.evaluate(node.target)

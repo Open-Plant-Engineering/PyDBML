@@ -418,31 +418,66 @@ class Parser:
     def _parse_function_def(self):
         self._consume_expected("DEFINE")
         self._consume_expected("FUNCTION")
-
+    
         name_token = self._consume()
-
+    
         if name_token.type != "GLOBAL_VAR":
-            raise SyntaxError("Function name must be global (use !!)")
-
+            raise SyntaxError("Function name must be global (!!)")
+    
         func_name = name_token.value.replace("!", "")
-
-        # parse ()
+    
+        # --------------------------
+        # Parse parameters
+        # --------------------------
         self._consume_expected("LPAREN")
+    
+        params = []
+    
+        if not self._match("RPAREN"):
+        
+            while True:
+                var_token = self._consume()
+    
+                if var_token.type != "LOCAL_VAR":
+                    raise SyntaxError("Expected parameter name (!var)")
+    
+                param_name = var_token.value.replace("!", "")
+    
+                self._consume_expected("IS")
+    
+                type_token = self._consume()
+    
+                param_type = type_token.value.upper()
+    
+                params.append((param_name, param_type))
+    
+                if self._match("COMMA"):
+                    self._consume()
+                    continue
+                
+                break
+            
         self._consume_expected("RPAREN")
-
-        # optional "IS TYPE"
-        if self._match("IS"):
-            self._consume()  # skip IS
-            self._consume()  # skip type
-
-        # parse body
+    
+        # --------------------------
+        # Return type (mandatory)
+        # --------------------------
+        self._consume_expected("IS")
+    
+        return_type_token = self._consume()
+        return_type = return_type_token.value.upper()
+    
+        # --------------------------
+        # Body
+        # --------------------------
         body = []
-
+    
         while not self._match("ENDFUNCTION"):
             body.append(self.statement())
-
+    
         self._consume_expected("ENDFUNCTION")
-        return FunctionDefNode(func_name, body)
+    
+        return FunctionDefNode(func_name, params, return_type, body)
     
     def _parse_return(self):
         self._consume_expected("RETURN")

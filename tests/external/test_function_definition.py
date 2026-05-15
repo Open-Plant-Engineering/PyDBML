@@ -7,7 +7,7 @@ def test_simple_return(tmp_path):
 
     # function file
     (lib / "TEST.pdfnc").write_text("""
-define function !!TEST()
+define function !!TEST() is real
     return 10
 endfunction
 """)
@@ -28,7 +28,7 @@ def test_expression_return(tmp_path):
     lib.mkdir()
 
     (lib / "ADD.pdfnc").write_text("""
-define function !!ADD()
+define function !!ADD() is real
     return 5 + 5
 endfunction
 """)
