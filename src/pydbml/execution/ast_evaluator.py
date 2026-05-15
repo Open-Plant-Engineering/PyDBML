@@ -73,24 +73,17 @@ class ASTEvaluator:
             # --------------------------
             # Create new scope
             # --------------------------
-            old_scope = self.env._local.copy()
+            self.env.push_scope()
 
             try:
-                # --------------------------
-                # Bind parameters with type enforcement
-                # --------------------------
+                # bind params
                 for (param_name, param_type), value in zip(func_ast.params, arg_values):
                 
                     if not check_type(value, param_type):
-                        raise TypeError(
-                            f"Parameter '{param_name}' must be {param_type}, got {type(value).__name__}"
-                        )
+                        raise TypeError(...)
 
                     self.env.set(param_name, value, is_global=False)
 
-                # --------------------------
-                # Execute function body
-                # --------------------------
                 result = None
 
                 for stmt in func_ast.body:
@@ -100,17 +93,14 @@ class ASTEvaluator:
 
             except ReturnSignal as r:
             
-                # ✅ RETURN TYPE VALIDATION
                 if not check_type(r.value, func_ast.return_type):
-                    raise TypeError(
-                        f"Function '{node.name}' must return {func_ast.return_type}"
-                    )
+                    raise TypeError(...)
 
                 return r.value
-        
+
             finally:
-                # ✅ restore scope
-                self.env._local = old_scope
+                # ✅ always restore scope
+                self.env.pop_scope()
 
 
         if isinstance(node, CallNode):
