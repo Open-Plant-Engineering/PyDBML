@@ -1,21 +1,29 @@
 import os
-import json
 
-SUPPORTED_TYPES = (".pdfnc", ".pdfrm", ".pdcmd", ".pdobj")
+
+SUPPORTED = (".pdfnc", ".pdfrm", ".pdcmd", ".pdobj")
 
 
 def build_index(path):
-    index = {}
+    entries = []
 
-    for file in os.listdir(path):
-        name, ext = os.path.splitext(file)
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            ext = os.path.splitext(file)[1].lower()
 
-        if ext.lower() in SUPPORTED_TYPES:
-            index[name.upper()] = file
+            if ext not in SUPPORTED:
+                continue
 
-    index_path = os.path.join(path, "index.json")
+            rel_dir = os.path.relpath(root, path)
 
-    with open(index_path, "w") as f:
-        json.dump(index, f, indent=4)
+            if rel_dir == ".":
+                rel_path = file
+            else:
+                rel_path = f"{rel_dir}/{file}"
 
-    return index
+            entries.append(rel_path)
+
+    index_file = os.path.join(path, "index.txt")
+
+    with open(index_file, "w") as f:
+        f.write("\n".join(entries))

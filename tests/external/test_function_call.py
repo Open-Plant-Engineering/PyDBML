@@ -3,22 +3,21 @@ import os
 
 
 def test_external_function(tmp_path):
-    # ✅ create temp pmllib folder
+    # ✅ create pmllib folder
     lib = tmp_path / "pmllib"
     lib.mkdir()
 
     # ✅ create function file
     (lib / "HELLO.pdfnc").write_text("1 + 2")
 
-    # ✅ create index
-    import json
-    with open(lib / "index.json", "w") as f:
-        json.dump({"HELLO": "HELLO.pdfnc"}, f)
+    # ✅ create index.txt (NEW FORMAT ✅)
+    (lib / "index.txt").write_text("HELLO.pdfnc\n")
 
-    # ✅ run
+    # ✅ init engine
     engine = Engine()
     engine.config.add_path(str(lib))
 
+    # ✅ execute
     result = engine.execute("!!HELLO()")
 
     assert result.value == 3

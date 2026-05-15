@@ -1,5 +1,4 @@
 import os
-import json
 
 
 class ResourceResolver:
@@ -7,22 +6,32 @@ class ResourceResolver:
     def __init__(self, config):
         self.config = config
 
-    def resolve(self, name, extension):
+    def resolve(self, name):
         name = name.upper()
 
-        for path in self.config.paths:
-            index_file = os.path.join(path, "index.json")
+        for base_path in self.config.paths:
+            index_file = os.path.join(base_path, "index.txt")
 
             if not os.path.exists(index_file):
                 continue
 
             with open(index_file) as f:
-                index = json.load(f)
+                for line in f:
+                    line = line.strip()
 
-            if name in index:
-                file_path = os.path.join(path, index[name])
+                    if not line:
+                        continue
 
-                if file_path.endswith(extension):
-                    return file_path
+                    # ✅ Extract file name
+                    rel_path = line
 
-        raise FileNotFoundError(f"{name}{extension} not found")
+                    file_name = os.path.basename(rel_path)
+                    base_name, ext = os.path.splitext(file_name)
+
+                    if base_name.upper() == name:
+                        full_path = os.path.join(base_path, rel_path)
+
+                        if os.path.exists(full_path):
+                            return full_path
+
+        raise FileNotFoundError(f"{name} not found in pdlib paths")
