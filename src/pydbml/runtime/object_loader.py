@@ -1,5 +1,8 @@
 from pydbml.parser.parser import Parser
-
+from pydbml.ast.nodes import ( 
+    ObjectDefNode,
+    MethodDefNode,
+)
 class ObjectLoader:
 
     def __init__(self, resolver):
@@ -15,6 +18,31 @@ class ObjectLoader:
             code = f.read()
 
         parser = Parser(code)
-        ast = parser.parse()
 
-        return ast
+        nodes = []
+
+        # ✅ collect ALL statements
+        while not parser._at_end():
+            nodes.append(parser.statement())
+
+        obj_def = None
+        methods = {}
+
+        # --------------------------
+        # Separate object + methods
+        # --------------------------
+        for node in nodes:
+
+            if isinstance(node, ObjectDefNode):
+                obj_def = node
+
+            if isinstance(node, MethodDefNode):
+                methods[node.name] = node
+
+        if not obj_def:
+            raise Exception(f"No object definition found for {name}")
+
+        # ✅ attach methods
+        obj_def.methods = methods
+
+        return obj_def

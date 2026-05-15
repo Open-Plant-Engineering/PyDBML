@@ -6,7 +6,12 @@ TOKEN_SPEC = [
     ("NUMBER", r"\d+(\.\d+)?"),
     ("STRING", r"'[^']*'"),
 
-    ("DEFINE", r"\b(DEFINE|define)\b"),
+    ("DEFINE", r"\bdefine\b"),
+    ("METHOD", r"\bmethod\b"),
+    ("ENDMETHOD", r"\bendmethod\b"),
+    ("OBJECT", r"\bobject\b"),
+    ("MEMBER", r"\bmember\b"),
+    ("ENDOBJECT", r"\bendobject\b"),
     ("FUNCTION", r"\b(FUNCTION|function)\b"),
     ("ENDFUNCTION", r"\b(ENDFUNCTION|endfunction)\b"),
     ("RETURN", r"\b(RETURN|return)\b"),

@@ -159,20 +159,22 @@ class Parser:
         if token.type == "STRING":
             return StringNode(token.value.strip("'"))
     
-        # ✅ ADD THIS BLOCK HERE
-        if token.type == "IDENTIFIER" and token.value.lower() == "object":
+        # --------------------------
+        # Object creation (UPDATED ✅)
+        # --------------------------
+        if token.type == "OBJECT":
             from pydbml.ast.nodes import ObjectNode
-    
+
             type_token = self._consume()
-    
+
             if type_token.type != "IDENTIFIER":
                 raise SyntaxError("Expected type after 'object'")
-    
+
             type_name = type_token.value.lower()
-    
+
             self._consume_expected("LPAREN")
             self._consume_expected("RPAREN")
-    
+
             return ObjectNode(type_name)
     
         if token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
@@ -256,12 +258,14 @@ class Parser:
     # Helpers
     # --------------------------
     def _peek(self):
+        if self.pos >= len(self.tokens):
+            return None
         return self.tokens[self.pos]
 
     def _peek_next(self):
-        if self.pos + 1 < len(self.tokens):
-            return self.tokens[self.pos + 1]
-        return None
+        if self.pos + 1 >= len(self.tokens):
+            return None
+        return self.tokens[self.pos + 1]
 
     def _consume(self):
         token = self.tokens[self.pos]
@@ -498,15 +502,10 @@ class Parser:
         return ReturnNode(value)
     
     def _parse_object_def(self):
-
         self._consume_expected("DEFINE")
-
-        obj_token = self._consume()
-        if obj_token.value.lower() != "object":
-            raise SyntaxError("Expected 'object' after DEFINE")
+        self._consume_expected("OBJECT")
 
         name_token = self._consume()
-
         obj_name = name_token.value.upper()
 
         members = {}
@@ -514,29 +513,75 @@ class Parser:
         # --------------------------
         # Parse members
         # --------------------------
-        while not self._match("IDENTIFIER") or self._peek().value.lower() != "endobject":
-
+        while True:
             token = self._peek()
 
-            # member .x is TYPE
+            # ✅ stop condition
+            if token and token.type == "ENDOBJECT":
+                break
+
+            # ✅ member
             if token.value.lower() == "member":
-                self._consume()   # member
+                self._consume()
 
                 self._consume_expected("DOT")
-
                 attr = self._consume().value
 
                 self._consume_expected("IS")
-
                 type_token = self._consume()
 
                 members[attr] = type_token.value.upper()
-
                 continue
 
             raise SyntaxError(f"Unexpected token in object: {token}")
 
-        # consume "endobject"
-        self._consume()  # IDENTIFIER(endobject)
+        # ✅ consume ENDOBJECT
+        self._consume_expected("ENDOBJECT")
 
+        from pydbml.ast.nodes import ObjectDefNode
         return ObjectDefNode(obj_name, members, methods={})
+    
+    def _parse_method_def(self):
+    
+        self._consume_expected("DEFINE")
+        self._consume_expected("METHOD")
+    
+        self._consume_expected("DOT")
+    
+        name_token = self._consume()
+        method_name = name_token.value
+    
+        # --------------------------
+        # Parse parameters (currently empty)
+        # --------------------------
+        self._consume_expected("LPAREN")
+        self._consume_expected("RPAREN")
+    
+        # ✅ optional return type (your test uses: "is real")
+        if self._match("IS"):
+            self._consume()
+            self._consume()  # type token (ignore for now)
+    
+        # --------------------------
+        # Parse body
+        # --------------------------
+        body = []
+    
+        while True:
+            token = self._peek()
+    
+            # ✅ STOP HERE
+            if token and token.type == "ENDMETHOD":
+                break
+            
+            body.append(self.statement())
+    
+        # ✅ consume ENDMETHOD
+        self._consume_expected("ENDMETHOD")
+    
+        from pydbml.ast.nodes import MethodDefNode
+        return MethodDefNode(method_name, body)
+    
+    def _at_end(self):
+        return self.pos >= len(self.tokens)
+

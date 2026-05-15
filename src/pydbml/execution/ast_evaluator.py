@@ -132,28 +132,22 @@ class ASTEvaluator:
             target = self.evaluate(node.target)
             args = [self.evaluate(arg) for arg in node.args]
 
-            # --------------------------
-            # Case 1: Object method
-            # --------------------------
-            if isinstance(target, tuple) and target[0] == "__method__":
-                _, obj, method_name = target
-
-                method = obj.definition.methods[method_name]
-
-                return self._execute_method(obj, method, args)
+            method_name = node.method
 
             # --------------------------
-            # Case 2: Generic methods (PML2)
+            # ✅ Case 1: Object method
             # --------------------------
-            if hasattr(node, "method"):
-                method = node.method.upper()
+            if isinstance(target, ObjectInstance):
+            
+                # ✅ check object-defined methods FIRST
+                if method_name in target.definition.methods:
+                    method = target.definition.methods[method_name]
+                    return self._execute_method(target, method, args)
 
-                return MethodRegistry.call(method, target, args)
-
             # --------------------------
-            # Fallback
+            # ✅ Case 2: Generic method (PML-style)
             # --------------------------
-            raise Exception(f"Unsupported CallNode: {node}")
+            return MethodRegistry.call(method_name, target, args)
         
         # --------------------------
         # DOT ACCESS
@@ -424,13 +418,18 @@ class ASTEvaluator:
         self.env.push_scope()
 
         try:
-            # bind THIS
-            self.env.set("this", instance, is_global=False)
+            # ✅ bind THIS
+            self.env.set("this", instance, False)
+
+            result = None
 
             for stmt in method_node.body:
                 result = self.evaluate(stmt)
 
             return result
+
+        except ReturnSignal as r:
+            return r.value
 
         finally:
             self.env.pop_scope()
