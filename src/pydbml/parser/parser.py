@@ -555,6 +555,24 @@ class Parser:
         # Parse parameters (currently empty)
         # --------------------------
         self._consume_expected("LPAREN")
+
+        params = []
+
+        if not self._match("RPAREN"):
+            while True:
+                param_token = self._consume()  # !x
+                param_name = param_token.value.replace("!", "")
+
+                self._consume_expected("IS")
+                type_token = self._consume()
+
+                params.append((param_name, type_token.value.upper()))
+
+                if self._match("COMMA"):
+                    self._consume()
+                    continue
+                break
+            
         self._consume_expected("RPAREN")
     
         # ✅ optional return type (your test uses: "is real")
@@ -580,7 +598,7 @@ class Parser:
         self._consume_expected("ENDMETHOD")
     
         from pydbml.ast.nodes import MethodDefNode
-        return MethodDefNode(method_name, body)
+        return MethodDefNode(method_name, body, params)
     
     def _at_end(self):
         return self.pos >= len(self.tokens)

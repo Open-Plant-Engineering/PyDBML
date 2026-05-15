@@ -135,6 +135,7 @@ class ObjectDefNode(ASTNode):
         self.methods = methods    # dict {name: method AST}
 
 class MethodDefNode(ASTNode):
-    def __init__(self, name, body):
+    def __init__(self, name, body, params=None):
         self.name = name
         self.body = body
+        self.params = params or []

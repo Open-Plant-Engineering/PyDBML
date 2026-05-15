@@ -141,9 +141,18 @@ class ASTEvaluator:
             
                 # ✅ check object-defined methods FIRST
                 if method_name in target.definition.methods:
-                    method = target.definition.methods[method_name]
-                    return self._execute_method(target, method, args)
+                
+                    candidates = target.definition.methods[method_name]
 
+                    # ✅ select by argument count
+                    for method in candidates:
+                        if len(method.params) == len(args):
+                            return self._execute_method(target, method, args)
+
+                    raise Exception(
+                        f"No matching overload for {method_name} with {len(args)} args"
+                    )
+                    
             # --------------------------
             # ✅ Case 2: Generic method (PML-style)
             # --------------------------
@@ -420,6 +429,16 @@ class ASTEvaluator:
         try:
             # ✅ bind THIS
             self.env.set("this", instance, False)
+
+            # ✅ bind parameters
+            for (param_name, param_type), value in zip(method_node.params, args):
+
+                if not check_type(value, param_type):
+                    raise TypeError(
+                        f"{param_name} expects {param_type}"
+                    )
+
+                self.env.set(param_name, value, False)
 
             result = None
 
