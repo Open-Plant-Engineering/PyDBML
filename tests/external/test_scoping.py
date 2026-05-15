@@ -1,7 +1,7 @@
 from pydbml.core.engine import Engine
 
 def setup_lib(tmp_path, code, name="TEST"):
-    lib = tmp_path / "pmllib"
+    lib = tmp_path / "pdlib"
     lib.mkdir()
 
     (lib / f"{name}.pdfnc").write_text(code)
@@ -46,7 +46,7 @@ endfunction
     assert result2.value == 100
 
 def test_nested_calls(tmp_path):
-    lib = tmp_path / "pmllib"
+    lib = tmp_path / "pdlib"
     lib.mkdir()
 
     (lib / "A.pdfnc").write_text("""

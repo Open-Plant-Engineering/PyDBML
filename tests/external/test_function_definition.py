@@ -2,7 +2,7 @@ from pydbml.core.engine import Engine
 
 
 def test_simple_return(tmp_path):
-    lib = tmp_path / "pmllib"
+    lib = tmp_path / "pdlib"
     lib.mkdir()
 
     # function file
@@ -24,7 +24,7 @@ endfunction
 
 
 def test_expression_return(tmp_path):
-    lib = tmp_path / "pmllib"
+    lib = tmp_path / "pdlib"
     lib.mkdir()
 
     (lib / "ADD.pdfnc").write_text("""

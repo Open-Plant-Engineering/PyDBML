@@ -5,6 +5,8 @@ from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
 from pydbml.execution.return_signal import ReturnSignal
+from pydbml.runtime.type_system import check_type
+from pydbml.runtime.object_loader import ObjectLoader
 from pydbml.ast.nodes import (
     IfNode,
     LogicalOpNode,
@@ -41,7 +43,10 @@ class ASTEvaluator:
 
             if node.type_name.lower() != "object":
                 # load custom object
-                loader = ObjectLoader(self.resolver)
+                try:
+                    loader = ObjectLoader(self.resolver)
+                except NameError:
+                    raise Exception("ObjectLoader not available - import missing")
                 obj_def = loader.load(node.type_name)
 
                 instance = ObjectInstance(obj_def)
@@ -183,19 +188,31 @@ class ASTEvaluator:
         if isinstance(node, DotAssignNode):
             obj = self.evaluate(node.target)
             value = self.evaluate(node.value)
-        
+
             debug("DOT ASSIGN", f"{node.attribute} = {value}")
-        
-            # ✅ ObjectInstance
+
+            # ✅ ObjectInstance (typed enforcement)
             if isinstance(obj, ObjectInstance):
+                # ✅ attribute must exist
+                if node.attribute not in obj.definition.members:
+                    raise KeyError(f"Unknown member '{node.attribute}'")
+
+                expected_type = obj.definition.members[node.attribute]
+
+                # ✅ allow None assignment (optional design choice)
+                if value is not None and not check_type(value, expected_type):
+                    raise TypeError(
+                        f"Member '{node.attribute}' expects {expected_type}"
+                    )
+
                 obj.value[node.attribute] = value
                 return value
-        
-            # ✅ primitive dict fallback (old behavior)
+
+            # ✅ fallback (old behavior for arrays/dicts)
             if hasattr(obj, "value") and isinstance(obj.value, dict):
                 obj.value[node.attribute] = value
                 return value
-        
+
             raise TypeError("Dot assignment not supported for this type")
         
         # --------------------------

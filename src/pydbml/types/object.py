@@ -4,6 +4,6 @@ class ObjectInstance:
         self.definition = definition  # ObjectDefNode
         self.value = {}
 
-        # ✅ initialize members
-        for name in definition.members:
-            self.value[name] = None
+        # ✅ initialize all members
+        for name, type_name in definition.members.items():
+            self.value[name] = None   # no default yet

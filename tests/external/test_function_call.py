@@ -3,8 +3,8 @@ import os
 
 
 def test_external_function(tmp_path):
-    # ✅ create pmllib folder
-    lib = tmp_path / "pmllib"
+    # ✅ create pdlib folder
+    lib = tmp_path / "pdlib"
     lib.mkdir()
 
     # ✅ create function file

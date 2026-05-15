@@ -15,6 +15,7 @@ from pydbml.ast.nodes import (
     FunctionCallNode,
     FunctionDefNode,
     ReturnNode,
+    ObjectDefNode,
 )
 
 
@@ -35,7 +36,19 @@ class Parser:
     def statement(self):
 
         if self._match("DEFINE"):
-            return self._parse_function_def()
+            # lookahead
+            if self._peek_next() and self._peek_next().value.lower() == "function":
+                return self._parse_function_def()
+
+            if self._peek_next() and self._peek_next().value.lower() == "object":
+                return self._parse_object_def()
+
+            # later: method
+            if self._peek_next() and self._peek_next().value.lower() == "method":
+                return self._parse_method_def()
+
+            raise SyntaxError("Unknown DEFINE type")
+
         if self._match("RETURN"):
             return self._parse_return()
 
@@ -483,3 +496,47 @@ class Parser:
         self._consume_expected("RETURN")
         value = self.expression()
         return ReturnNode(value)
+    
+    def _parse_object_def(self):
+
+        self._consume_expected("DEFINE")
+
+        obj_token = self._consume()
+        if obj_token.value.lower() != "object":
+            raise SyntaxError("Expected 'object' after DEFINE")
+
+        name_token = self._consume()
+
+        obj_name = name_token.value.upper()
+
+        members = {}
+
+        # --------------------------
+        # Parse members
+        # --------------------------
+        while not self._match("IDENTIFIER") or self._peek().value.lower() != "endobject":
+
+            token = self._peek()
+
+            # member .x is TYPE
+            if token.value.lower() == "member":
+                self._consume()   # member
+
+                self._consume_expected("DOT")
+
+                attr = self._consume().value
+
+                self._consume_expected("IS")
+
+                type_token = self._consume()
+
+                members[attr] = type_token.value.upper()
+
+                continue
+
+            raise SyntaxError(f"Unexpected token in object: {token}")
+
+        # consume "endobject"
+        self._consume()  # IDENTIFIER(endobject)
+
+        return ObjectDefNode(obj_name, members, methods={})

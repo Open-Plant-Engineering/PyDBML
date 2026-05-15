@@ -2,7 +2,7 @@ from pydbml.core.engine import Engine
 
 
 def test_add_function(tmp_path):
-    lib = tmp_path / "pmllib"
+    lib = tmp_path / "pdlib"
     lib.mkdir()
 
     (lib / "ADD.pdfnc").write_text("""
@@ -22,7 +22,7 @@ endfunction
 
 
 def test_type_enforcement(tmp_path):
-    lib = tmp_path / "pmllib"
+    lib = tmp_path / "pdlib"
     lib.mkdir()
 
     (lib / "ADD.pdfnc").write_text("""
