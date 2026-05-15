@@ -48,7 +48,9 @@ TOKEN_SPEC = [
 
     ("LPAREN", r"\("),
     ("RPAREN", r"\)"),
-        
+
+    ("COMMA", r","),
+
     ("LBRACKET", r"\["),
     ("RBRACKET", r"\]"),
     

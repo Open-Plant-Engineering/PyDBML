@@ -1,6 +1,6 @@
 from pydbml.types.primitives import Number, String, Boolean
 from pydbml.types.array import Array
-
+from pydbml.runtime.methods import MethodRegistry
 from pydbml.ast.nodes import (
     IfNode,
     LogicalOpNode,
@@ -27,48 +27,10 @@ class ASTEvaluator:
         debug("NODE START", node)
 
         if isinstance(node, CallNode):
-        
             target = self.evaluate(node.target)
             args = [self.evaluate(arg) for arg in node.args]
-
-            method = node.method.upper()
-
-            debug("CALL", f"{method} with args {args}")
-
-            # --------------------------
-            # Comparison Methods
-            # --------------------------
-            if method == "EQ":
-                return Boolean(target.value == args[0].value)
-
-            if method == "NEQ":
-                return Boolean(target.value != args[0].value)
-
-            if method == "GT":
-                return Boolean(target.value > args[0].value)
-
-            if method == "LT":
-                return Boolean(target.value < args[0].value)
-
-            if method == "GEQ":
-                return Boolean(target.value >= args[0].value)
-
-            if method == "LEQ":
-                return Boolean(target.value <= args[0].value)
-
-            # --------------------------
-            # Logical
-            # --------------------------
-            if method == "AND":
-                return Boolean(target.value and args[0].value)
-
-            if method == "OR":
-                return Boolean(target.value or args[0].value)
-
-            if method == "NOT":
-                return Boolean(not target.value)
-
-            raise Exception(f"Unknown method: {method}")
+            debug("CALL", f"{node.method} on {target} with args {args}")
+            return MethodRegistry.call(node.method, target, args)
         
         if isinstance(node, DotAccessNode):
             obj = self.evaluate(node.target)
