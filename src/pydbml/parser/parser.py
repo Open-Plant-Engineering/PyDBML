@@ -8,7 +8,8 @@ from pydbml.ast.nodes import (
     BinaryOpNode,
     IfNode,
     IndexAssignNode,
-    DotAssignNode
+    DotAssignNode,
+    CallNode,
 )
 
 
@@ -187,10 +188,7 @@ class Parser:
                                 args.append(self.expression())
 
                         self._consume_expected("RPAREN")
-
-                        from pydbml.ast.nodes import CallNode
                         node = CallNode(node, method_name, args)
-
                     else:
                         node = DotAccessNode(node, method_name)
                     continue
