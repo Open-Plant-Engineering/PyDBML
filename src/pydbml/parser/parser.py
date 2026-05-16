@@ -52,22 +52,49 @@ class Parser:
             if next_token and next_token.type == "EQUAL":
                 return self.assignment()
                 
-        if self._peek() and self._peek().type == "IDENTIFIER" and self._peek().value.lower() == "skip":
+        # --------------------------
+        # ✅ SKIP handling
+        # --------------------------
+        if self._match("SKIP"):
             self._consume()
-
-            if not (self._peek() and self._peek().type == "IF"):
-                raise SyntaxError("Expected IF after SKIP")
-
-            self._consume()
-
-            if self._match("LPAREN"):
+        
+            # ✅ skip if(...)
+            if self._match("IF"):
                 self._consume()
-                condition = self.expression()
-                self._consume_expected("RPAREN")
-            else:
-                condition = self.expression()
-
-            return SkipIfNode(condition)
+        
+                if self._match("LPAREN"):
+                    self._consume()
+                    condition = self.expression()
+                    self._consume_expected("RPAREN")
+                else:
+                    condition = self.expression()
+        
+                return SkipIfNode(condition)
+        
+            # ✅ standalone skip
+            return SkipIfNode(None)
+        
+        # --------------------------
+        # ✅ BREAK handling
+        # --------------------------
+        if self._match("BREAK"):
+            self._consume()
+        
+            # ✅ break if(...)
+            if self._match("IF"):
+                self._consume()
+        
+                if self._match("LPAREN"):
+                    self._consume()
+                    condition = self.expression()
+                    self._consume_expected("RPAREN")
+                else:
+                    condition = self.expression()
+        
+                return BreakIfNode(condition)
+        
+            # ✅ standalone break
+            return BreakNode()        
         
         if self._match("IF"):
             pos_backup = self.pos
@@ -85,24 +112,6 @@ class Parser:
                 return SkipIfNode(condition)
         
             self.pos = pos_backup
-
-        # ✅ THEN other statements
-        if self._match("BREAK"):
-            self._consume()
-
-            if self._match("IF"):
-                self._consume()
-
-                if self._match("LPAREN"):
-                    self._consume()
-                    condition = self.expression()
-                    self._consume_expected("RPAREN")
-                else:
-                    condition = self.expression()
-
-                return BreakIfNode(condition)
-
-            return BreakNode()
 
         if self._match("DO"):
             return self._parse_do()
@@ -430,9 +439,13 @@ class Parser:
         return token
 
     def _consume_expected(self, token_type):
-        token = self._consume()
+        token = self._peek()
+        print("DEBUG consume_expected:", token_type, "got:", token)
+        if token is None:
+            raise SyntaxError(f"Expected {token_type}, but reached end of input")
         if token.type != token_type:
             raise SyntaxError(f"Expected {token_type}, got {token.type}")
+        return self._consume()
 
     def _match(self, *types):
         if self.pos < len(self.tokens) and self.tokens[self.pos].type in types:
@@ -794,53 +807,111 @@ class Parser:
         return self.pos >= len(self.tokens)
 
     def _parse_do(self):
-        self._consume()  # DO
-
-        var = None
+        self._consume_expected("DO")
+    
+        var_name = None
+        mode = None
+        iterable = None
         start = None
         end = None
         step = None
-        mode = None
-        iterable = None
+    
+        # --------------------------
+        # CASE 1: LOOP WITH VARIABLE (SAFE CHECK)
+        # --------------------------
+        if self._peek() and self._peek().type == "LOCAL_VAR":
+        
+            next_token = self._peek_next()
+    
+            # ✅ IMPORTANT: only treat as loop variable IF proper syntax follows
+            if next_token and next_token.type in ("INDICES", "VALUES", "FROM", "TO"):
+            
+                var_token = self._consume_expected("LOCAL_VAR")
+                var_name = var_token.value.lstrip("!")
+    
+                # --------------------------
+                # SUBCASE: indices loop
+                # --------------------------
+                if self._peek() and self._peek().type == "INDICES":
+                    self._consume_expected("INDICES")
+    
+                    iterable_token = self._consume_expected("LOCAL_VAR")
+                    iterable = iterable_token.value.lstrip("!")
+    
+                    return self._parse_do_body(
+                        var_name=var_name,
+                        mode="indices",
+                        iterable=iterable
+                    )
+    
+                # --------------------------
+                # SUBCASE: values loop
+                # --------------------------
+                if self._peek() and self._peek().type == "VALUES":
+                    self._consume_expected("VALUES")
+    
+                    iterable_token = self._consume_expected("LOCAL_VAR")
+                    iterable = iterable_token.value.lstrip("!")
+    
+                    return self._parse_do_body(
+                        var_name=var_name,
+                        mode="values",
+                        iterable=iterable
+                    )
+    
+                # --------------------------
+                # SUBCASE: range loop (FROM)
+                # --------------------------
+                if self._peek() and self._peek().type == "FROM":
+                    self._consume_expected("FROM")
+    
+                    start = self.expression()
+    
+                    self._consume_expected("TO")
+    
+                    end = self.expression()
+    
+                    if self._peek() and self._peek().type == "BY":
+                        self._consume_expected("BY")
+                        step = self.expression()
+    
+                    return self._parse_do_body(
+                        var_name=var_name,
+                        start=start,
+                        end=end,
+                        step=step
+                    )
+    
+                # --------------------------
+                # SUBCASE: shorthand TO loop
+                # --------------------------
+                if self._peek() and self._peek().type == "TO":
+                    self._consume_expected("TO")
+    
+                    start = NumberNode(1)
+                    end = self.expression()
+    
+                    return self._parse_do_body(
+                        var_name=var_name,
+                        start=start,
+                        end=end
+                    )
+    
+            # ✅ IMPORTANT: fallback → NOT a loop variable
+            # treat as infinite loop
+            return self._parse_do_body()
+    
+        # --------------------------
+        # CASE 2: infinite loop
+        # --------------------------
+        return self._parse_do_body()
 
-        # ✅ NEW: indices / values
-        if self._peek() and self._peek().type == "IDENTIFIER" and self._peek().value.lower() in ("indices", "values"):
-            mode_token = self._consume()
-            mode = mode_token.value.lower()
+    def _parse_do_body(self, var_name=None, mode=None,
+                       iterable=None, start=None, end=None, step=None):
 
-            var_token = self._consume()
-            if var_token.type not in ("LOCAL_VAR", "GLOBAL_VAR"):
-                raise SyntaxError("Expected variable after indices/values")
-
-            iterable = var_token.value.replace("!", "")
-
-        # ✅ OLD: numeric loops
-        elif self._match("LOCAL_VAR") and self._peek_next() and self._peek_next().type in ("TO", "FROM"):
-            var_token = self._consume()
-            var = var_token.value.replace("!", "")
-
-            if self._match("TO"):
-                self._consume()
-                start = NumberNode(1.0)
-                end = self.expression()
-                step = NumberNode(1.0)
-
-            elif self._match("FROM"):
-                self._consume()
-                start = self.expression()
-
-                self._consume_expected("TO")
-                end = self.expression()
-
-                if self._match("BY"):
-                    self._consume()
-                    step = self.expression()
-                else:
-                    step = NumberNode(1.0)
-
-        # ✅ body
         body = []
-        while not self._at_end() and not self._match("ENDDO"):
+
+        while self._peek() and self._peek().type != "ENDDO":
             stmt = self.statement()
             if stmt:
                 body.append(stmt)
@@ -848,11 +919,11 @@ class Parser:
         self._consume_expected("ENDDO")
 
         return DoNode(
-            body,
-            var=var,
+            var=var_name,
+            mode=mode,
+            iterable=iterable,
             start=start,
             end=end,
             step=step,
-            mode=mode,
-            iterable=iterable
+            body=body
         )

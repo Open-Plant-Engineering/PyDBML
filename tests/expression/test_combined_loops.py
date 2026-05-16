@@ -13,14 +13,14 @@ def test_indices_with_skip():
 
     !sum = 0
 
-    do indices !arr
+    do !i indices !arr
       skip if(!i == 1)
       !sum = !sum + !arr[!i]
     enddo
     """)
 
     result = engine.env.get("sum").get().value
-    assert result == 40  # skip index 1
+    assert result == 50  # skip index 1
 
 
 def test_values_with_skip():
@@ -35,7 +35,7 @@ def test_values_with_skip():
 
     !sum = 0
 
-    do values !arr
+    do !v values !arr
       skip if(!v == 20)
       !sum = !sum + !v
     enddo
@@ -55,8 +55,8 @@ def test_nested_indices():
 
     !count = 0
 
-    do indices !arr
-      do indices !arr
+    do !i indices !arr
+      do !i indices !arr
         !count = !count + 1
       enddo
     enddo

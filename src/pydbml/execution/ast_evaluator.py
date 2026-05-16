@@ -45,11 +45,14 @@ class ASTEvaluator:
 
         debug("NODE START", node)
         if isinstance(node, SkipIfNode):
-            print("SKIP CONDITION CHECK")
-            cond = self.evaluate(node.condition)
-            print("SKIP CONDITION VALUE:", cond)
-            if isinstance(cond, Boolean) and cond.value:
-                print("→ SKIPPING ITERATION")
+        
+            # ✅ standalone skip
+            if node.condition is None:
+                raise ContinueSignal()
+
+            # ✅ conditional skip
+            condition = self.evaluate(node.condition)
+            if condition.value:
                 raise ContinueSignal()
             return None
 
@@ -60,60 +63,44 @@ class ASTEvaluator:
             return result
 
         if isinstance(node, DoNode):
-
+        
             print("\n=== DO LOOP START ===")
             print("MODE:", node.mode)
-            print("ITERABLE:", node.iterable)
-            # ✅ FIX: indices loop
+
+            # --------------------------
+            # ✅ 1. INDICES LOOP
+            # --------------------------
             if node.mode == "indices":
-                arr = self.env.get(node.iterable).get()
-                self.env.set("__in_indices__", Boolean(True), False)
+                array_obj = self.env.get(node.iterable).get()
 
-                values = list(arr.value.values())
-                self.env.set("__skip_active__", Boolean(False), False)
+                for key in sorted(array_obj.value.keys()):
+                    print(f"[INDICES] {node.var} = {key}")
 
-                for i in range(1, len(values) + 1):
-                    print("INDEX LOOP i:", i)
-                    self.env.set("i", Number(i), False)
-                    skip_iteration = False
-
-                    for stmt in node.body:
-                        try:
-                            self.evaluate(stmt)
-                        except ContinueSignal:
-                            self.env.set("__skip_active__", Boolean(True), False)
-                            print("→ CONTINUE (skip whole iteration)")
-                            skip_iteration = True
-                            break
-                        
-                    if skip_iteration:
-                        continue
-                self.env.set("__in_indices__", Boolean(False), False)
-                return None
-
-            # ✅ FIX: values loop
-            if node.mode == "values":
-                arr = self.env.get(node.iterable).get()
-
-                for val in arr.value.values():
-                    debug("VALUE LOOP:", val)
-
-                    self.env.set("v", val if hasattr(val, "value") else Number(val), False)
+                    # ✅ loop variable = actual index
+                    self.env.set(node.var, Number(key), False)
 
                     try:
                         for stmt in node.body:
                             self.evaluate(stmt)
                     except ContinueSignal:
-                        print("→ CONTINUE")
                         continue
                     except BreakSignal:
-                        print("→ BREAK")
                         break
                     
                 return None
-            # ✅ simple infinite loop
-            if node.var is None and node.mode is None:
-                while True:
+
+            # --------------------------
+            # ✅ 2. VALUES LOOP
+            # --------------------------
+            if node.mode == "values":
+                array_obj = self.env.get(node.iterable).get()
+
+                for val in array_obj.value.values():
+                    print(f"[VALUES] {node.var} = {val}")
+
+                    # ✅ loop variable = value
+                    self.env.set(node.var, val, False)
+
                     try:
                         for stmt in node.body:
                             self.evaluate(stmt)
@@ -121,41 +108,62 @@ class ASTEvaluator:
                         continue
                     except BreakSignal:
                         break
+                    
                 return None
 
-            # ✅ loop with variable
-            start_val = self.evaluate(node.start).value
-            end_val = self.evaluate(node.end).value
-            step_val = self.evaluate(node.step).value
+            # --------------------------
+            # ✅ 3. RANGE LOOP
+            # --------------------------
+            if node.start is not None:
+            
+                start_val = self.evaluate(node.start).value
+                end_val = self.evaluate(node.end).value
+                step_val = self.evaluate(node.step).value if node.step else 1
 
-            i = start_val
+                i = start_val
 
-            while True:
-                # ✅ loop condition (supports both directions)
-                if step_val > 0 and i > end_val:
-                    break
-                if step_val < 0 and i < end_val:
-                    break
+                while True:
                 
-                # ✅ assign loop variable
-                self.env.set(node.var, Number(i), is_global=False)
+                    if step_val > 0 and i > end_val:
+                        break
+                    if step_val < 0 and i < end_val:
+                        break
+                    
+                    print(f"[RANGE] {node.var} = {i}")
+
+                    self.env.set(node.var, Number(i), False)
+
+                    try:
+                        for stmt in node.body:
+                            self.evaluate(stmt)
+                    except ContinueSignal:
+                        i += step_val
+                        continue
+                    except BreakSignal:
+                        break
+                    
+                    i += step_val
+
+                return None
+
+            # --------------------------
+            # ✅ 4. INFINITE LOOP
+            # --------------------------
+            while True:
                 try:
                     for stmt in node.body:
                         self.evaluate(stmt)
                 except ContinueSignal:
-                    i += step_val
                     continue
                 except BreakSignal:
                     break
-                i += step_val
+                
             return None
 
         if isinstance(node, BreakIfNode):
-            cond = self.evaluate(node.condition)
-
-            if isinstance(cond, Boolean) and cond.value:
+            condition = self.evaluate(node.condition)
+            if condition.value:
                 raise BreakSignal()
-
             return None
 
         if isinstance(node, BreakNode):
@@ -448,44 +456,10 @@ class ASTEvaluator:
         # Index Access
         # --------------------------
         if isinstance(node, IndexAccessNode):
-            debug("INDEX ACCESS NODE", node)
-
-            target = self.evaluate(node.target)
-            index = self.evaluate(node.index)
-
-            debug("TARGET ARRAY", target.value)
-            debug("INDEX REQUESTED", index.value)
-
-            i = int(index.value)
-
-            # ✅ check if inside indices loop
-            in_indices = False
-            try:
-                in_indices = self.env.get("__in_indices__").get().value
-            except:
-                pass
-            
-            skip_active = False
-            try:
-                skip_active = self.env.get("__skip_active__").get().value
-            except:
-                pass
-            
-            if in_indices and skip_active:
-                keys = sorted(target.value.keys())
-
-                if i == len(keys):
-                    real_key = keys[-1]
-                else:
-                    real_key = keys[i - 2]
-
-                result = target.get(real_key)
-            else:
-                result = target.get(i)
-
-            debug("INDEX RESULT", result)
-
-            return result
+            array_obj = self.evaluate(node.target)
+            index = int(self.evaluate(node.index).value)
+        
+            return array_obj.get(index)
 
         # --------------------------
         # NOT

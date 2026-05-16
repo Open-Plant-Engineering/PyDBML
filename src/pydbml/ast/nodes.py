@@ -151,17 +151,17 @@ class PipeStringNode(ASTNode):
         self.raw = raw
 
 class DoNode:
-    def __init__(self, body, var=None, start=None, end=None, step=None,
-                 mode=None, iterable=None):
-        self.body = body
-        self.var = var
+    def __init__(self, var=None, mode=None, iterable=None,
+                 start=None, end=None, step=None, body=None):
+        self.var = var          # loop variable (string)
+        self.mode = mode        # "indices", "values", or None
+        self.iterable = iterable
+
         self.start = start
         self.end = end
         self.step = step
 
-        # ✅ NEW
-        self.mode = mode
-        self.iterable = iterable
+        self.body = body or []
 
 class BreakNode:
     pass

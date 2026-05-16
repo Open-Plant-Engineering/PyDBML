@@ -106,7 +106,10 @@ TOKEN_SPEC = [
     ("ENDDO", r"\benddo\b"),
     ("BREAK", r"\bbreak\b"),
     ("SKIP", r"\bskip\b"),
-
+    
+    ("INDICES", r"\bindices\b"),
+    ("VALUES", r"\bvalues\b"),
+    
     # ✅ ALWAYS LAST
     ("IDENTIFIER", r"[a-zA-Z_]\w*"),
 ]
@@ -122,7 +125,7 @@ def tokenize(code: str):
         kind = match.lastgroup
         value = match.group()
 
-        if kind in ("SKIP", "COMMENT_LINE", "COMMENT_BLOCK"):
+        if kind in ("COMMENT_LINE", "COMMENT_BLOCK"):
             continue
 
         # ✅ normalize keywords

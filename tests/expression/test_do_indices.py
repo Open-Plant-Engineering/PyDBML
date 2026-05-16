@@ -13,7 +13,7 @@ def test_do_indices_basic():
 
     !sum = 0
 
-    do indices !arr
+    do !i indices !arr
       !sum = !sum + !arr[!i]
     enddo
     """)
@@ -34,7 +34,7 @@ def test_do_indices_length():
 
     !count = 0
 
-    do indices !arr
+    do !i indices !arr
       !count = !count + 1
     enddo
     """)

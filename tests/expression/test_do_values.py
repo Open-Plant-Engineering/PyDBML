@@ -13,7 +13,7 @@ def test_do_values_basic():
 
     !sum = 0
 
-    do values !arr
+    do !v values !arr
       !sum = !sum + !v
     enddo
     """)
@@ -34,7 +34,7 @@ def test_do_values_modify():
 
     !sum = 0
 
-    do values !arr
+    do !v values !arr
       !sum = !sum + (!v * 2)
     enddo
     """)
