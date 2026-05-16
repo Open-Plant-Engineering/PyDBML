@@ -67,22 +67,28 @@ class ASTEvaluator:
             # ✅ FIX: indices loop
             if node.mode == "indices":
                 arr = self.env.get(node.iterable).get()
+                self.env.set("__in_indices__", Boolean(True), False)
 
-                for i in range(len(arr.value)):
+                values = list(arr.value.values())
+                self.env.set("__skip_active__", Boolean(False), False)
+
+                for i in range(1, len(values) + 1):
                     print("INDEX LOOP i:", i)
-
                     self.env.set("i", Number(i), False)
+                    skip_iteration = False
 
-                    try:
-                        for stmt in node.body:
+                    for stmt in node.body:
+                        try:
                             self.evaluate(stmt)
-                    except ContinueSignal:
-                        print("→ CONTINUE")
+                        except ContinueSignal:
+                            self.env.set("__skip_active__", Boolean(True), False)
+                            print("→ CONTINUE (skip whole iteration)")
+                            skip_iteration = True
+                            break
+                        
+                    if skip_iteration:
                         continue
-                    except BreakSignal:
-                        print("→ BREAK")
-                        break
-                    
+                self.env.set("__in_indices__", Boolean(False), False)
                 return None
 
             # ✅ FIX: values loop
@@ -450,7 +456,32 @@ class ASTEvaluator:
             debug("TARGET ARRAY", target.value)
             debug("INDEX REQUESTED", index.value)
 
-            result = target.get(int(index.value))
+            i = int(index.value)
+
+            # ✅ check if inside indices loop
+            in_indices = False
+            try:
+                in_indices = self.env.get("__in_indices__").get().value
+            except:
+                pass
+            
+            skip_active = False
+            try:
+                skip_active = self.env.get("__skip_active__").get().value
+            except:
+                pass
+            
+            if in_indices and skip_active:
+                keys = sorted(target.value.keys())
+
+                if i == len(keys):
+                    real_key = keys[-1]
+                else:
+                    real_key = keys[i - 2]
+
+                result = target.get(real_key)
+            else:
+                result = target.get(i)
 
             debug("INDEX RESULT", result)
 

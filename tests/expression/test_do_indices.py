@@ -7,9 +7,9 @@ def test_do_indices_basic():
     engine.execute("""
     !arr = object(array)
 
-    !arr[0] = 10
-    !arr[1] = 20
-    !arr[2] = 30
+    !arr[1] = 10
+    !arr[2] = 20
+    !arr[3] = 30
 
     !sum = 0
 
@@ -28,9 +28,9 @@ def test_do_indices_length():
     engine.execute("""
     !arr = object(array)
 
-    !arr[0] = 1
-    !arr[1] = 2
-    !arr[2] = 3
+    !arr[1] = 1
+    !arr[2] = 2
+    !arr[3] = 3
 
     !count = 0
 

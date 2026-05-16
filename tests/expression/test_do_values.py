@@ -7,9 +7,9 @@ def test_do_values_basic():
     engine.execute("""
     !arr = object(array)
 
-    !arr[0] = 5
-    !arr[1] = 10
-    !arr[2] = 15
+    !arr[1] = 5
+    !arr[2] = 10
+    !arr[3] = 15
 
     !sum = 0
 
@@ -28,9 +28,9 @@ def test_do_values_modify():
     engine.execute("""
     !arr = object(array)
 
-    !arr[0] = 1
-    !arr[1] = 2
-    !arr[2] = 3
+    !arr[1] = 1
+    !arr[2] = 2
+    !arr[3] = 3
 
     !sum = 0
 
