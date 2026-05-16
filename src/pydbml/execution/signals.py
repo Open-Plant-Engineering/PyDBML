@@ -1,7 +1,9 @@
+from pydbml.utils.debug import debug
+
 class BreakSignal(Exception):
-    print("→ CONTINUE TRIGGERED")
+    debug("→ CONTINUE TRIGGERED")
     pass
 
 class ContinueSignal(Exception):
-    print("→ BREAK TRIGGERED")
+    debug("→ BREAK TRIGGERED")
     pass

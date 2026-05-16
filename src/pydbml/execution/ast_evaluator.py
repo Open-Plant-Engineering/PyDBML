@@ -90,7 +90,7 @@ class ASTEvaluator:
                 arr = self.env.get(node.iterable).get()
 
                 for val in arr.value.values():
-                    print("VALUE LOOP:", val)
+                    debug("VALUE LOOP:", val)
 
                     self.env.set("v", val if hasattr(val, "value") else Number(val), False)
 
@@ -432,7 +432,7 @@ class ASTEvaluator:
             debug("INDEX VALUE", index)
             debug("VALUE TO SET", value)
 
-            array_obj.set(int(index.value) + 1, value)
+            array_obj.set(int(index.value), value)
 
             debug("ARRAY AFTER SET", array_obj.value)
 
@@ -450,7 +450,7 @@ class ASTEvaluator:
             debug("TARGET ARRAY", target.value)
             debug("INDEX REQUESTED", index.value)
 
-            result = target.get(int(index.value) + 1)
+            result = target.get(int(index.value))
 
             debug("INDEX RESULT", result)
 

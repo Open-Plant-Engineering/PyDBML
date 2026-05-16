@@ -24,7 +24,7 @@ from pydbml.ast.nodes import (
     ObjectNode,
     SkipIfNode,
 )
-
+from pydbml.utils.debug import debug
 
 class Parser:
     def __init__(self, code: str):
@@ -47,20 +47,20 @@ class Parser:
         token = self._peek()
         next_token = self._peek_next()
 
-        print("\n--- STATEMENT START ---")
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("\n--- STATEMENT START ---")
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
 
         # ✅ ✅ 1. ALWAYS HANDLE ASSIGNMENT FIRST (CRITICAL FIX)
         if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             if next_token and next_token.type == "EQUAL":
-                print("✅ TAKING ASSIGNMENT PATH")
+                debug("✅ TAKING ASSIGNMENT PATH")
                 return self.assignment()
                 
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
         if self._peek() and self._peek().type == "IDENTIFIER" and self._peek().value.lower() == "skip":
             self._consume()
 
@@ -79,10 +79,10 @@ class Parser:
             return SkipIfNode(condition)
         
         # ✅ Skip-if detection (IMPORTANT FIX)
-        print("\n--- STATEMENT START ---")
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("\n--- STATEMENT START ---")
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
 
         if self._match("IF"):
             pos_backup = self.pos
@@ -101,10 +101,10 @@ class Parser:
         
             self.pos = pos_backup
 
-        print("\n--- STATEMENT START ---")
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("\n--- STATEMENT START ---")
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
 
         # ✅ THEN other statements
         if self._match("BREAK"):
@@ -124,18 +124,18 @@ class Parser:
 
             return BreakNode()
 
-        print("\n--- STATEMENT START ---")
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("\n--- STATEMENT START ---")
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
 
         if self._match("DO"):
             return self._parse_do()
 
-        print("\n--- STATEMENT START ---")
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("\n--- STATEMENT START ---")
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
 
         if self._match("DEFINE"):
             # lookahead
@@ -150,18 +150,18 @@ class Parser:
 
             raise SyntaxError("Unknown DEFINE type")
 
-        print("\n--- STATEMENT START ---")
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("\n--- STATEMENT START ---")
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
 
         if self._match("RETURN"):
             return self._parse_return()
 
-        print("\n--- STATEMENT START ---")
-        print("POS:", self.pos)
-        print("TOKEN:", self._peek())
-        print("NEXT:", self._peek_next())
+        debug("\n--- STATEMENT START ---")
+        debug("POS:", self.pos)
+        debug("TOKEN:", self._peek())
+        debug("NEXT:", self._peek_next())
 
         # ✅ dot/index AFTER assignment
         if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
@@ -171,7 +171,7 @@ class Parser:
             if self._is_index_assignment():
                 return self._parse_index_assignment()
 
-        print("❌ FALLBACK TO EXPRESSION")
+        debug("❌ FALLBACK TO EXPRESSION")
         return self.expression()
 
     # --------------------------
