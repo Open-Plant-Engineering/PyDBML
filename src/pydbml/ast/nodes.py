@@ -87,8 +87,9 @@ class IndexAssignNode(ASTNode):
 # Object Creation
 # --------------------------
 class ObjectNode(ASTNode):
-    def __init__(self, type_name):
+    def __init__(self, type_name, args=None):
         self.type_name = type_name
+        self.args = args or []
 
 # --------------------------
 # Dot Access

@@ -5,7 +5,7 @@ def test_do_indices_basic():
     engine = Engine()
 
     engine.execute("""
-    !arr = object(array)
+    !arr = object array()
 
     !arr[1] = 10
     !arr[2] = 20
@@ -26,7 +26,7 @@ def test_do_indices_length():
     engine = Engine()
 
     engine.execute("""
-    !arr = object(array)
+    !arr = object array()
 
     !arr[1] = 1
     !arr[2] = 2

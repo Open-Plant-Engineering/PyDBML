@@ -260,32 +260,28 @@ class Parser:
         # Object creation (UPDATED ✅)
         # --------------------------
         if token.type == "OBJECT":
-            # ✅ CASE 1: object(array)
-            if self._match("LPAREN"):
-                self._consume()  # (
-
-                type_token = self._consume()
-                if type_token.type != "IDENTIFIER":
-                    raise SyntaxError("Expected type inside object(...)")
-
-                type_name = type_token.value.lower()
-
-                self._consume_expected("RPAREN")
-                return ObjectNode(type_name)
-
-            # ✅ CASE 2: object USER()
-            else:
-                type_token = self._consume()
-
-                if type_token.type != "IDENTIFIER":
-                    raise SyntaxError("Expected type after 'object'")
-
-                type_name = type_token.value.lower()
-
-                self._consume_expected("LPAREN")
-                self._consume_expected("RPAREN")
-
-                return ObjectNode(type_name)
+            type_token = self._consume()
+        
+            if type_token.type != "IDENTIFIER":
+                raise SyntaxError("Expected type after 'object'")
+        
+            type_name = type_token.value.lower()
+        
+            self._consume_expected("LPAREN")
+        
+            args = []
+        
+            # ✅ parse arguments
+            if not self._match("RPAREN"):
+                args.append(self.expression())
+        
+                while self._match("COMMA"):
+                    self._consume()
+                    args.append(self.expression())
+        
+            self._consume_expected("RPAREN")
+        
+            return ObjectNode(type_name, args)
 
         if token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             is_global = token.type == "GLOBAL_VAR"

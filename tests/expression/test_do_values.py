@@ -5,7 +5,7 @@ def test_do_values_basic():
     engine = Engine()
 
     engine.execute("""
-    !arr = object(array)
+    !arr = object array()
 
     !arr[1] = 5
     !arr[2] = 10
@@ -26,7 +26,7 @@ def test_do_values_modify():
     engine = Engine()
 
     engine.execute("""
-    !arr = object(array)
+    !arr = object array()
 
     !arr[1] = 1
     !arr[2] = 2

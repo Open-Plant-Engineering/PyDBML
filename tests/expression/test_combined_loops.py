@@ -5,7 +5,7 @@ def test_indices_with_skip():
     engine = Engine()
 
     engine.execute("""
-    !arr = object(array)
+    !arr = object array()
 
     !arr[1] = 10
     !arr[2] = 20
@@ -27,7 +27,7 @@ def test_values_with_skip():
     engine = Engine()
 
     engine.execute("""
-    !arr = object(array)
+    !arr = object array()
 
     !arr[1] = 10
     !arr[2] = 20
@@ -49,7 +49,7 @@ def test_nested_indices():
     engine = Engine()
 
     engine.execute("""
-    !arr = object(array)
+    !arr = object array()
     !arr[1] = 1
     !arr[2] = 2
 

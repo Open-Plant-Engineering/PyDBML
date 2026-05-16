@@ -83,7 +83,7 @@ def test_values_loop_global_array():
     engine = Engine()
 
     engine.execute("""
-    !!arr = object(array)
+    !!arr = object array()
     !!arr[1] = 10
     !!arr[2] = 20
     !!arr[3] = 30
@@ -101,7 +101,7 @@ def test_values_loop_skip_if_global():
     engine = Engine()
 
     engine.execute("""
-    !!arr = object(array)
+    !!arr = object array()
     !!arr[1] = 10
     !!arr[2] = 20
     !!arr[3] = 30
@@ -121,7 +121,7 @@ def test_indices_loop_global_array():
     engine = Engine()
 
     engine.execute("""
-    !!arr = object(array)
+    !!arr = object array()
     !!arr[1] = 5
     !!arr[2] = 10
     !!arr[3] = 15
@@ -139,7 +139,7 @@ def test_indices_loop_break_if_global():
     engine = Engine()
 
     engine.execute("""
-    !!arr = object(array)
+    !!arr = object array()
     !!arr[1] = 5
     !!arr[2] = 10
     !!arr[3] = 15

@@ -249,29 +249,41 @@ class ASTEvaluator:
                 return Array()
 
             if node.type_name.lower() != "object":
-                # load custom object
-                try:
-                    loader = ObjectLoader(self.resolver)
-                except NameError:
-                    raise Exception("ObjectLoader not available - import missing")
-                obj_def = loader.load(node.type_name)
+            
+                loader = ObjectLoader(self.resolver)
+                obj_def = loader.load(node.type_name.lower())
 
                 instance = ObjectInstance(obj_def)
 
-                # ✅ call constructor if exists
-                method_name = node.type_name.lower()
+                constructor_name = node.type_name.lower()
+
+                # ✅ evaluate arguments
+                args = [self.evaluate(arg) for arg in node.args]
+
+                if constructor_name in obj_def.methods:
                 
-                if method_name in obj_def.methods:
-                    methods = obj_def.methods[method_name]
-                
-                    if not isinstance(methods, list):
-                        methods = [methods]
-                
-                    # ✅ constructor must have 0 params
-                    for method in methods:
-                        if len(method.params) == 0:
-                            self._execute_method(instance, method, [])
+                    methods = obj_def.methods[constructor_name]
+                    
+                    # ✅ methods is a list
+                    selected = None
+                    
+                    for m in methods:
+                        if len(m.params) == len(args):
+                            selected = m
                             break
+                        
+                    if selected is None:
+                        raise Exception(
+                            f"No matching constructor '{constructor_name}' for {len(args)} arguments"
+                        )
+                    
+                    self._execute_method(instance, selected, args)
+                else:
+                    # ✅ if constructor not present but args given → error
+                    if len(args) > 0:
+                        raise Exception(
+                            f"No constructor defined for '{node.type_name}' but arguments provided"
+                        )
 
                 return instance
 
