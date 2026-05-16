@@ -47,11 +47,6 @@ class Parser:
         token = self._peek()
         next_token = self._peek_next()
 
-        # ✅ ✅ 1. ALWAYS HANDLE ASSIGNMENT FIRST (CRITICAL FIX)
-        if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
-            if next_token and next_token.type == "EQUAL":
-                return self.assignment()
-                
         # --------------------------
         # ✅ SKIP handling
         # --------------------------
@@ -132,13 +127,59 @@ class Parser:
         if self._match("RETURN"):
             return self._parse_return()
 
-        # ✅ dot/index AFTER assignment
+        # ✅ assignment detection (variable, index, dot)
         if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
-            if self._is_dot_assignment():
-                return self._parse_dot_assignment()
+        
+            save_pos = self.pos
 
-            if self._is_index_assignment():
-                return self._parse_index_assignment()
+            left = self._parse_primary()
+
+            # ✅ allow full postfix chain: [ ] and .
+            while True:
+            
+                if self._match("LBRACKET"):
+                    self._consume()
+                    index_expr = self.expression()
+                    self._consume_expected("RBRACKET")
+                    left = IndexAccessNode(left, index_expr)
+                    continue
+                
+                if self._match("DOT"):
+                    self._consume()
+                    attr_token = self._consume()
+
+                    if attr_token.type not in (
+                        "IDENTIFIER",
+                        "AND", "OR", "NOT",
+                        "EQ_KW", "NEQ_KW",
+                        "GT_KW", "LT_KW",
+                        "GE_KW", "LE_KW"
+                    ):
+                        raise SyntaxError("Expected attribute name after '.'")
+
+                    left = DotAccessNode(left, attr_token.value.lower())
+                    continue
+                
+                break
+            
+            # ✅ assignment
+            if self._match("EQUAL"):
+                self._consume()
+                value = self.expression()
+
+                if isinstance(left, VariableNode):
+                    return AssignNode(left.name, value, left.is_global)
+
+                if isinstance(left, IndexAccessNode):
+                    return IndexAssignNode(left.target, left.index, value)
+
+                if isinstance(left, DotAccessNode):
+                    return DotAssignNode(left.target, left.attribute, value)
+
+                raise SyntaxError("Invalid assignment target")
+
+            # ✅ rollback if not assignment
+            self.pos = save_pos
 
         return self.expression()
 
@@ -207,18 +248,71 @@ class Parser:
         return node
 
     def _parse_factor(self):
-        # ✅ FIX: handle unary minus FIRST
+        # ✅ unary minus first
         if self._match("MINUS"):
             self._consume()
             operand = self._parse_factor()
             return BinaryOpNode(NumberNode(0), "-", operand)
 
-        # existing logic
+        # ✅ start with primary
         node = self._parse_primary()
 
+        # ✅ UNIFIED postfix handling (INDEX + DOT + CALL)
+        while True:
+
+            # --------------------------
+            # Index access
+            # --------------------------
+            if self._match("LBRACKET"):
+                self._consume()
+                index_expr = self.expression()
+                self._consume_expected("RBRACKET")
+                node = IndexAccessNode(node, index_expr)
+                continue
+
+            # --------------------------
+            # Dot access / method call
+            # --------------------------
+            if self._match("DOT"):
+                self._consume()
+                attr_token = self._consume()
+
+                if attr_token.type not in (
+                    "IDENTIFIER",
+                    "AND", "OR", "NOT",
+                    "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
+                ):
+                    raise SyntaxError("Expected attribute name after '.'")
+
+                method_name = attr_token.value.lower()
+
+                # ✅ method call
+                if self._match("LPAREN"):
+                    self._consume()
+
+                    args = []
+                    if not self._match("RPAREN"):
+                        args.append(self.expression())
+
+                        while self._match("COMMA"):
+                            self._consume()
+                            args.append(self.expression())
+
+                    self._consume_expected("RPAREN")
+                    node = CallNode(node, method_name, args)
+
+                # ✅ attribute access
+                else:
+                    node = DotAccessNode(node, method_name)
+
+                continue
+
+            break
+
+        # ✅ multiplication / division (higher precedence)
         while self._match("MUL", "DIV"):
             op = self._consume().value
-            right = self._parse_primary()
+            right = self._parse_factor()   # ✅ recursive for chaining
             node = BinaryOpNode(node, op, right)
 
         return node
@@ -303,54 +397,6 @@ class Parser:
                 return FunctionCallNode(name, args)
 
             node = VariableNode(name, is_global)
-
-            while True:
-            
-                # --------------------------
-                # Index access
-                # --------------------------
-                if self._match("LBRACKET"):
-                    self._consume()
-                    index_expr = self.expression()
-                    self._consume_expected("RBRACKET")
-                    node = IndexAccessNode(node, index_expr)
-                    continue
-                
-                # --------------------------
-                # Dot access / method call
-                # --------------------------
-                if self._match("DOT"):
-                    self._consume()
-                    attr_token = self._consume()
-                    method_name = attr_token.value.lower()
-
-                    # ✅ allow identifiers + all keyword-based methods
-                    if attr_token.type not in (
-                        "IDENTIFIER",
-                        "AND", "OR", "NOT",
-                        "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
-                    ):
-                        raise SyntaxError("Expected attribute name after '.'")
-
-                    # ✅ method call
-                    if self._match("LPAREN"):
-                        self._consume()  # (
-
-                        args = []
-
-                        if not self._match("RPAREN"):
-                            args.append(self.expression())
-
-                            while self._match("COMMA"):
-                                self._consume()
-                                args.append(self.expression())
-
-                        self._consume_expected("RPAREN")
-                        node = CallNode(node, method_name, args)
-                    else:
-                        node = DotAccessNode(node, method_name)
-                    continue
-                break
             return node
     
         if token.type == "LPAREN":
@@ -360,55 +406,6 @@ class Parser:
         
         if token.type == "IDENTIFIER":
             node = VariableNode(token.value, is_global=False)
-        
-            while True:
-            
-                # --------------------------
-                # Index access
-                # --------------------------
-                if self._match("LBRACKET"):
-                    self._consume()
-                    index_expr = self.expression()
-                    self._consume_expected("RBRACKET")
-                    node = IndexAccessNode(node, index_expr)
-                    continue
-                
-                # --------------------------
-                # Dot access / method call
-                # --------------------------
-                if self._match("DOT"):
-                    self._consume()
-                    attr_token = self._consume()
-                    method_name = attr_token.value.lower()
-        
-                    if attr_token.type not in (
-                        "IDENTIFIER",
-                        "AND", "OR", "NOT",
-                        "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
-                    ):
-                        raise SyntaxError("Expected attribute name after '.'")
-        
-                    if self._match("LPAREN"):
-                        self._consume()
-        
-                        args = []
-        
-                        if not self._match("RPAREN"):
-                            args.append(self.expression())
-        
-                            while self._match("COMMA"):
-                                self._consume()
-                                args.append(self.expression())
-        
-                        self._consume_expected("RPAREN")
-                        node = CallNode(node, method_name, args)
-                    else:
-                        node = DotAccessNode(node, method_name)
-        
-                    continue
-                
-                break
-            
             return node
         
         raise SyntaxError(f"Unexpected token: {token.type}")
@@ -831,13 +828,7 @@ class Parser:
                 if self._peek() and self._peek().type == "INDICES":
                     self._consume_expected("INDICES")
 
-                    token = self._peek()
-                    if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
-                        iterable_token = self._consume()
-                    else:
-                        raise SyntaxError(f"Expected variable, got {token}")
-
-                    iterable = iterable_token.value.lstrip("!")
+                    iterable = self.expression()
     
                     return self._parse_do_body(
                         var_name=var_name,
@@ -851,13 +842,7 @@ class Parser:
                 if self._peek() and self._peek().type == "VALUES":
                     self._consume_expected("VALUES")
 
-                    token = self._peek()
-                    if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
-                        iterable_token = self._consume()
-                    else:
-                        raise SyntaxError(f"Expected variable after VALUES, got {token}")
-
-                    iterable = iterable_token.value.lstrip("!")
+                    iterable = self.expression()
     
                     return self._parse_do_body(
                         var_name=var_name,

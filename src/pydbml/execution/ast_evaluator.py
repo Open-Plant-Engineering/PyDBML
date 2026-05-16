@@ -9,6 +9,7 @@ from pydbml.execution.return_signal import ReturnSignal
 from pydbml.execution.signals import BreakSignal, ContinueSignal
 from pydbml.runtime.type_system import check_type
 from pydbml.runtime.object_loader import ObjectLoader
+from pydbml.runtime.variable import Variable
 from pydbml.ast.nodes import (
     IfNode,
     LogicalOpNode,
@@ -73,7 +74,13 @@ class ASTEvaluator:
             # ✅ 1. INDICES LOOP
             # --------------------------
             if node.mode == "indices":
-                array_obj = self.env.get(node.iterable).get()
+                iter_value = self.evaluate(node.iterable)
+
+                # unwrap variable if needed
+                if isinstance(iter_value, Variable):
+                    iter_value = iter_value.get()
+
+                array_obj = iter_value
 
                 for key in sorted(array_obj.value.keys()):
                     print(f"[INDICES] {node.var} = {key}")
@@ -95,7 +102,13 @@ class ASTEvaluator:
             # ✅ 2. VALUES LOOP
             # --------------------------
             if node.mode == "values":
-                array_obj = self.env.get(node.iterable).get()
+                iter_value = self.evaluate(node.iterable)
+
+                # unwrap variable if needed
+                if isinstance(iter_value, Variable):
+                    iter_value = iter_value.get()
+
+                array_obj = iter_value
 
                 for val in array_obj.value.values():
                     print(f"[VALUES] {node.var} = {val}")
@@ -475,25 +488,19 @@ class ASTEvaluator:
         if isinstance(node, IndexAssignNode):
             debug("INDEX ASSIGN NODE", node)
 
-            if node.target.is_global:
-                var = self.env.get_global(node.target.name)
-            else:
-                var = self.env.get(node.target.name)
+            # ✅ evaluate target (this handles nested arrays properly)
+            target_obj = self.evaluate(node.target)
 
-            array_obj = var.get()
-            debug("ARRAY BEFORE SET", array_obj.value)
-
-            index = self.evaluate(node.index)
+            index_val = self.evaluate(node.index).value
             value = self.evaluate(node.value)
 
-            debug("INDEX VALUE", index)
+            debug("INDEX VALUE", index_val)
             debug("VALUE TO SET", value)
 
-            array_obj.set(int(index.value), value)
+            # ✅ actual assignment
+            target_obj.set(int(index_val), value)
 
-            debug("ARRAY AFTER SET", array_obj.value)
-
-            return f"{node.target.name}[{int(index.value)}] set"
+            return value
 
         # --------------------------
         # Index Access
