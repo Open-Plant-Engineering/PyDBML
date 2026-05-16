@@ -151,16 +151,25 @@ class PipeStringNode(ASTNode):
         self.raw = raw
 
 class DoNode:
-    def __init__(self, body, var=None, start=None, end=None, step=None):
+    def __init__(self, body, var=None, start=None, end=None, step=None,
+                 mode=None, iterable=None):
         self.body = body
         self.var = var
         self.start = start
         self.end = end
         self.step = step
 
+        # ✅ NEW
+        self.mode = mode
+        self.iterable = iterable
+
 class BreakNode:
     pass
 
 class BreakIfNode:
+    def __init__(self, condition):
+        self.condition = condition
+
+class SkipIfNode:
     def __init__(self, condition):
         self.condition = condition

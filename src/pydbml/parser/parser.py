@@ -21,6 +21,8 @@ from pydbml.ast.nodes import (
     DoNode,
     BreakIfNode,
     BreakNode,
+    ObjectNode,
+    SkipIfNode,
 )
 
 
@@ -55,6 +57,49 @@ class Parser:
             if next_token and next_token.type == "EQUAL":
                 print("✅ TAKING ASSIGNMENT PATH")
                 return self.assignment()
+                
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
+        if self._peek() and self._peek().type == "IDENTIFIER" and self._peek().value.lower() == "skip":
+            self._consume()
+
+            if not (self._peek() and self._peek().type == "IF"):
+                raise SyntaxError("Expected IF after SKIP")
+
+            self._consume()
+
+            if self._match("LPAREN"):
+                self._consume()
+                condition = self.expression()
+                self._consume_expected("RPAREN")
+            else:
+                condition = self.expression()
+
+            return SkipIfNode(condition)
+        
+        # ✅ Skip-if detection (IMPORTANT FIX)
+        print("\n--- STATEMENT START ---")
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
+
+        if self._match("IF"):
+            pos_backup = self.pos
+        
+            self._consume()
+        
+            if self._match("LPAREN"):
+                self._consume()
+                condition = self.expression()
+                self._consume_expected("RPAREN")
+            else:
+                condition = self.expression()
+        
+            if not self._match("THEN"):
+                return SkipIfNode(condition)
+        
+            self.pos = pos_backup
 
         print("\n--- STATEMENT START ---")
         print("POS:", self.pos)
@@ -247,20 +292,33 @@ class Parser:
         # Object creation (UPDATED ✅)
         # --------------------------
         if token.type == "OBJECT":
-            from pydbml.ast.nodes import ObjectNode
+            # ✅ CASE 1: object(array)
+            if self._match("LPAREN"):
+                self._consume()  # (
 
-            type_token = self._consume()
+                type_token = self._consume()
+                if type_token.type != "IDENTIFIER":
+                    raise SyntaxError("Expected type inside object(...)")
 
-            if type_token.type != "IDENTIFIER":
-                raise SyntaxError("Expected type after 'object'")
+                type_name = type_token.value.lower()
 
-            type_name = type_token.value.lower()
+                self._consume_expected("RPAREN")
+                return ObjectNode(type_name)
 
-            self._consume_expected("LPAREN")
-            self._consume_expected("RPAREN")
+            # ✅ CASE 2: object USER()
+            else:
+                type_token = self._consume()
 
-            return ObjectNode(type_name)
-    
+                if type_token.type != "IDENTIFIER":
+                    raise SyntaxError("Expected type after 'object'")
+
+                type_name = type_token.value.lower()
+
+                self._consume_expected("LPAREN")
+                self._consume_expected("RPAREN")
+
+                return ObjectNode(type_name)
+
         if token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             is_global = token.type == "GLOBAL_VAR"
             name = token.value.replace("!", "")
@@ -777,54 +835,65 @@ class Parser:
         return self.pos >= len(self.tokens)
 
     def _parse_do(self):
-
-        print("\n--- DO LOOP BODY ---")
-        print("POS:", self.pos)
-        print("NEXT TOKEN:", self._peek())
-
         self._consume()  # DO
 
         var = None
         start = None
         end = None
         step = None
+        mode = None
+        iterable = None
 
-        # --------------------------
-        # ✅ CASE: do !i ...
-        # --------------------------
-        # ✅ ONLY treat as loop variable if followed by TO / FROM
-        if self._match("LOCAL_VAR") and self._peek_next() and self._peek_next().type in ("TO", "FROM"):
-        
+        # ✅ NEW: indices / values
+        if self._peek() and self._peek().type == "IDENTIFIER" and self._peek().value.lower() in ("indices", "values"):
+            mode_token = self._consume()
+            mode = mode_token.value.lower()
+
+            var_token = self._consume()
+            if var_token.type not in ("LOCAL_VAR", "GLOBAL_VAR"):
+                raise SyntaxError("Expected variable after indices/values")
+
+            iterable = var_token.value.replace("!", "")
+
+        # ✅ OLD: numeric loops
+        elif self._match("LOCAL_VAR") and self._peek_next() and self._peek_next().type in ("TO", "FROM"):
             var_token = self._consume()
             var = var_token.value.replace("!", "")
-        
+
             if self._match("TO"):
                 self._consume()
                 start = NumberNode(1.0)
                 end = self.expression()
                 step = NumberNode(1.0)
-        
+
             elif self._match("FROM"):
                 self._consume()
                 start = self.expression()
-        
+
                 self._consume_expected("TO")
                 end = self.expression()
-        
+
                 if self._match("BY"):
                     self._consume()
                     step = self.expression()
                 else:
                     step = NumberNode(1.0)
 
-        # ✅ fallback: infinite loop
+        # ✅ body
         body = []
         while not self._at_end() and not self._match("ENDDO"):
             stmt = self.statement()
-            if stmt is not None:
+            if stmt:
                 body.append(stmt)
 
         self._consume_expected("ENDDO")
 
-        return DoNode(body, var=var, start=start, end=end, step=step)
-
+        return DoNode(
+            body,
+            var=var,
+            start=start,
+            end=end,
+            step=step,
+            mode=mode,
+            iterable=iterable
+        )

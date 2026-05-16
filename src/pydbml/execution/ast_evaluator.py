@@ -6,7 +6,7 @@ from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
 from pydbml.execution.return_signal import ReturnSignal
-from pydbml.execution.signals import BreakSignal
+from pydbml.execution.signals import BreakSignal, ContinueSignal
 from pydbml.runtime.type_system import check_type
 from pydbml.runtime.object_loader import ObjectLoader
 from pydbml.ast.nodes import (
@@ -27,6 +27,7 @@ from pydbml.ast.nodes import (
     BreakNode,
     BreakIfNode,
     DoNode,
+    SkipIfNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.lexer.tokenizer import tokenize
@@ -43,6 +44,15 @@ class ASTEvaluator:
             return None
 
         debug("NODE START", node)
+        if isinstance(node, SkipIfNode):
+            print("SKIP CONDITION CHECK")
+            cond = self.evaluate(node.condition)
+            print("SKIP CONDITION VALUE:", cond)
+            if isinstance(cond, Boolean) and cond.value:
+                print("→ SKIPPING ITERATION")
+                raise ContinueSignal()
+            return None
+
         if isinstance(node, list):
             result = None
             for stmt in node:
@@ -50,13 +60,59 @@ class ASTEvaluator:
             return result
 
         if isinstance(node, DoNode):
-        
+
+            print("\n=== DO LOOP START ===")
+            print("MODE:", node.mode)
+            print("ITERABLE:", node.iterable)
+            # ✅ FIX: indices loop
+            if node.mode == "indices":
+                arr = self.env.get(node.iterable).get()
+
+                for i in range(len(arr.value)):
+                    print("INDEX LOOP i:", i)
+
+                    self.env.set("i", Number(i), False)
+
+                    try:
+                        for stmt in node.body:
+                            self.evaluate(stmt)
+                    except ContinueSignal:
+                        print("→ CONTINUE")
+                        continue
+                    except BreakSignal:
+                        print("→ BREAK")
+                        break
+                    
+                return None
+
+            # ✅ FIX: values loop
+            if node.mode == "values":
+                arr = self.env.get(node.iterable).get()
+
+                for val in arr.value.values():
+                    print("VALUE LOOP:", val)
+
+                    self.env.set("v", val if hasattr(val, "value") else Number(val), False)
+
+                    try:
+                        for stmt in node.body:
+                            self.evaluate(stmt)
+                    except ContinueSignal:
+                        print("→ CONTINUE")
+                        continue
+                    except BreakSignal:
+                        print("→ BREAK")
+                        break
+                    
+                return None
             # ✅ simple infinite loop
-            if node.var is None:
+            if node.var is None and node.mode is None:
                 while True:
                     try:
                         for stmt in node.body:
                             self.evaluate(stmt)
+                    except ContinueSignal:
+                        continue
                     except BreakSignal:
                         break
                 return None
@@ -77,12 +133,14 @@ class ASTEvaluator:
                 
                 # ✅ assign loop variable
                 self.env.set(node.var, Number(i), is_global=False)
-
                 try:
                     for stmt in node.body:
                         self.evaluate(stmt)
+                except ContinueSignal:
+                    i += step_val
+                    continue
                 except BreakSignal:
-                    break                
+                    break
                 i += step_val
             return None
 
@@ -374,7 +432,7 @@ class ASTEvaluator:
             debug("INDEX VALUE", index)
             debug("VALUE TO SET", value)
 
-            array_obj.set(int(index.value), value)
+            array_obj.set(int(index.value) + 1, value)
 
             debug("ARRAY AFTER SET", array_obj.value)
 
@@ -392,7 +450,7 @@ class ASTEvaluator:
             debug("TARGET ARRAY", target.value)
             debug("INDEX REQUESTED", index.value)
 
-            result = target.get(int(index.value))
+            result = target.get(int(index.value) + 1)
 
             debug("INDEX RESULT", result)
 

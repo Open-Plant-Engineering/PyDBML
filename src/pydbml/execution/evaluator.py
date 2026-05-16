@@ -56,7 +56,7 @@ class Evaluator:
 
         value = self.expr_evaluator.evaluate(rhs)
 
-        array_obj.set(index, value)
+        array_obj.set(int(index.value) + 1, value)
 
         return f"{name}[{index}] set"
 
