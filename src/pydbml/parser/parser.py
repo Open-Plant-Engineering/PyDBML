@@ -266,7 +266,60 @@ class Parser:
             node = self.expression()
             self._consume_expected("RPAREN")
             return node
-    
+        
+        if token.type == "IDENTIFIER":
+            node = VariableNode(token.value, is_global=False)
+        
+            while True:
+            
+                # --------------------------
+                # Index access
+                # --------------------------
+                if self._match("LBRACKET"):
+                    self._consume()
+                    index_expr = self.expression()
+                    self._consume_expected("RBRACKET")
+                    node = IndexAccessNode(node, index_expr)
+                    continue
+                
+                # --------------------------
+                # Dot access / method call
+                # --------------------------
+                if self._match("DOT"):
+                    self._consume()
+                    attr_token = self._consume()
+                    method_name = attr_token.value
+        
+                    if attr_token.type not in (
+                        "IDENTIFIER",
+                        "AND", "OR", "NOT",
+                        "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
+                    ):
+                        raise SyntaxError("Expected attribute name after '.'")
+        
+                    if self._match("LPAREN"):
+                        self._consume()
+        
+                        args = []
+        
+                        if not self._match("RPAREN"):
+                            args.append(self.expression())
+        
+                            while self._match("COMMA"):
+                                self._consume()
+                                args.append(self.expression())
+        
+                        self._consume_expected("RPAREN")
+                        node = CallNode(node, method_name, args)
+                    else:
+                        node = DotAccessNode(node, method_name)
+        
+                    continue
+                
+                break
+            
+            return node
+        
         raise SyntaxError(f"Unexpected token: {token.type}")
 
     # --------------------------

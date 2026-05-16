@@ -24,7 +24,8 @@ from pydbml.ast.nodes import (
     PipeStringNode,
     CommandVarNode,
 )
-
+from pydbml.parser.parser import Parser
+from pydbml.lexer.tokenizer import tokenize
 from pydbml.utils.debug import debug
 
 
@@ -42,11 +43,35 @@ class ASTEvaluator:
         if isinstance(node, PipeStringNode):
             text = node.raw
 
-            # ✅ new line
+            # ✅ newline support
             text = text.replace("$$", "\n")
 
-            def replace_var(match):
-                expr = match.group(1)
+            def replace_expr(match):
+                expr_group = match.group(1)   # $!(...)
+                var_group = match.group(2)    # $!x or $!!x
+
+                # --------------------------
+                # ✅ CASE 1: Expression
+                # --------------------------
+                if expr_group is not None:
+                    expr_code = expr_group.strip()
+                    
+                    parser = Parser(expr_code)
+                    ast = parser.parse()
+
+                    result = self.evaluate(ast)
+
+                    val = result.value if hasattr(result, "value") else result
+
+                    if isinstance(val, float) and val.is_integer():
+                        val = int(val)
+
+                    return str(val)
+
+                # --------------------------
+                # ✅ CASE 2: Variable
+                # --------------------------
+                expr = var_group
 
                 is_global = expr.startswith("!")
                 expr = expr.lstrip("!")
@@ -71,7 +96,11 @@ class ASTEvaluator:
 
                 return str(val)
 
-            text = re.sub(r"\$\!(\!?[a-zA-Z_][a-zA-Z0-9_.]*)", replace_var, text)
+            text = re.sub(
+                r"\$\!\((.*?)\)|\$\!(\!?[a-zA-Z_][a-zA-Z0-9_.]*)",
+                replace_expr,
+                text
+            )
 
             return String(text)
         
