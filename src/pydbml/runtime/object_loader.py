@@ -9,7 +9,7 @@ class ObjectLoader:
         self.resolver = resolver
 
     def load(self, name):
-        file_path = self.resolver.resolve(name)
+        file_path = self.resolver.resolve(name.lower())
 
         if not file_path.endswith(".pdobj"):
             raise Exception(f"{name} is not an object")

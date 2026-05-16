@@ -9,7 +9,7 @@ class FunctionLoader:
 
     def load(self, name):
         # ✅ resolve file path
-        file_path = self.resolver.resolve(name)
+        file_path = self.resolver.resolve(name.lower())
 
         if not file_path.endswith(".pdfnc"):
             raise Exception(f"{name} is not a function (.pdfnc)")

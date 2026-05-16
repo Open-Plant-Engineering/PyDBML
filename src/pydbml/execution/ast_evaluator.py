@@ -28,6 +28,8 @@ from pydbml.ast.nodes import (
     BreakIfNode,
     DoNode,
     SkipIfNode,
+    ObjectDefNode,
+    MethodDefNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.lexer.tokenizer import tokenize
@@ -277,6 +279,20 @@ class ASTEvaluator:
             value = self.evaluate(node.value)
             # special signal for return
             raise ReturnSignal(value)
+        
+        # --------------------------
+        # Object Definition
+        # --------------------------
+        if isinstance(node, ObjectDefNode):
+            # ✅ definition only, no runtime execution
+            return None
+
+        # --------------------------
+        # Method Definition
+        # --------------------------
+        if isinstance(node, MethodDefNode):
+            # ✅ definition only, no runtime execution
+            return None
         
         if isinstance(node, FunctionDefNode):
             # return last return value found
