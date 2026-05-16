@@ -139,3 +139,11 @@ class MethodDefNode(ASTNode):
         self.name = name
         self.body = body
         self.params = params or []
+
+class CommandVarNode(ASTNode):
+    def __init__(self, name):
+        self.name = name
+        
+class PipeStringNode(ASTNode):
+    def __init__(self, raw):
+        self.raw = raw

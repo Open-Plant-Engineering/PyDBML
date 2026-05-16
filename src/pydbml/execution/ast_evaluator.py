@@ -1,3 +1,4 @@
+import re
 from pydbml.types.primitives import Number, String, Boolean
 from pydbml.types.array import Array
 from pydbml.types.object import ObjectInstance
@@ -20,6 +21,8 @@ from pydbml.ast.nodes import (
     FunctionCallNode,
     FunctionDefNode, 
     ReturnNode,
+    PipeStringNode,
+    CommandVarNode,
 )
 
 from pydbml.utils.debug import debug
@@ -36,6 +39,45 @@ class ASTEvaluator:
 
         debug("NODE START", node)
 
+        if isinstance(node, PipeStringNode):
+            text = node.raw
+
+            # ✅ new line
+            text = text.replace("$$", "\n")
+
+            def replace_var(match):
+                expr = match.group(1)
+
+                parts = expr.split(".")
+
+                value = self.env.get(parts[0]).get()
+
+                # ✅ support u.age
+                for attr in parts[1:]:
+                    if isinstance(value, ObjectInstance):
+                        value = value.value[attr]
+                    else:
+                        value = value.get(attr)
+
+                val = value.value if hasattr(value, "value") else value
+
+                # ✅ remove .0
+                if isinstance(val, float) and val.is_integer():
+                    val = int(val)
+
+                return str(val)
+
+            text = re.sub(r"\$\!([a-zA-Z_][a-zA-Z0-9_.]*)", replace_var, text)
+
+            return String(text)
+        
+        if isinstance(node, CommandVarNode):
+            value = self.env.get(node.name).get()
+
+            debug("COMMAND VAR", f"{node.name} → {value}")
+
+            return value  # ✅ return AS-IS (no conversion)
+        
         if isinstance(node, ObjectNode):
         
             if node.type_name == "array":
@@ -217,26 +259,6 @@ class ASTEvaluator:
                 return value
 
             raise TypeError("Dot assignment not supported for this type")
-        
-        # --------------------------
-        # Object creation
-        # --------------------------
-        if isinstance(node, ObjectNode):
-            debug("OBJECT CREATE", node.type_name)
-
-            if node.type_name == "array":
-                return Array()
-
-            if node.type_name == "string":
-                return String("")
-
-            if node.type_name == "real":
-                return Number(0)
-
-            if node.type_name == "boolean":
-                return Boolean(False)
-
-            raise TypeError(f"Unknown object type: {node.type_name}")
 
         # --------------------------
         # Index Assignment
@@ -419,6 +441,13 @@ class ASTEvaluator:
 
             if node.op == "<=":
                 return Boolean(left.value <= right.value)
+            
+            if node.op == "&":
+                def fmt(v):
+                    if isinstance(v, float) and v.is_integer():
+                        return str(int(v))
+                    return str(v)
+                return String(fmt(left.value) + fmt(right.value))
 
         raise Exception(f"Unsupported AST node: {node}")
     

@@ -16,6 +16,8 @@ from pydbml.ast.nodes import (
     FunctionDefNode,
     ReturnNode,
     ObjectDefNode,
+    PipeStringNode,
+    CommandVarNode,
 )
 
 
@@ -93,7 +95,7 @@ class Parser:
         node = self._parse_term()
 
         while self._match( "EQ", "NE", "GT", "LT", "GE", "LE",
-            "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
+            "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW", "AMP"
         ):
             op_token = self._consume()
             op_map = {
@@ -111,6 +113,7 @@ class Parser:
                 "LT_KW": "<",
                 "GE_KW": ">=",
                 "LE_KW": "<=",
+                "AMP": "&"
             }
             op = op_map[op_token.type]
             right = self._parse_term()
@@ -141,6 +144,14 @@ class Parser:
     def _parse_primary(self):
         token = self._consume()
 
+        if token.type == "STRING_PIPE":
+            raw = token.value[1:-1]  # remove | |
+            return PipeStringNode(raw)
+
+        if token.type == "COMMAND_VAR":
+            name = token.value.replace("$!", "")
+            return CommandVarNode(name)
+        
         # --------------------------
         # Boolean
         # --------------------------

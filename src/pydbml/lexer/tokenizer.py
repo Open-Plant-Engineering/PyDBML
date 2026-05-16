@@ -3,48 +3,72 @@ from pydbml.lexer.tokens import Token
 from pydbml.utils.debug import debug
 
 TOKEN_SPEC = [
-    ("NUMBER", r"\d+(\.\d+)?"),
-    ("STRING", r"'[^']*'"),
 
+    # --------------------------
+    # Keywords (MUST COME FIRST)
+    # --------------------------
     ("DEFINE", r"\bdefine\b"),
+    ("FUNCTION", r"\bfunction\b"),
+    ("ENDFUNCTION", r"\bendfunction\b"),
+    ("RETURN", r"\breturn\b"),
+
+    ("OBJECT", r"\bobject\b"),
+    ("ENDOBJECT", r"\bendobject\b"),
+    ("MEMBER", r"\bmember\b"),
+
     ("METHOD", r"\bmethod\b"),
     ("ENDMETHOD", r"\bendmethod\b"),
-    ("OBJECT", r"\bobject\b"),
-    ("MEMBER", r"\bmember\b"),
-    ("ENDOBJECT", r"\bendobject\b"),
-    ("FUNCTION", r"\b(FUNCTION|function)\b"),
-    ("ENDFUNCTION", r"\b(ENDFUNCTION|endfunction)\b"),
-    ("RETURN", r"\b(RETURN|return)\b"),
-    ("IS", r"\b(IS|is)\b"),
 
-    # Keywords (case-insensitive handled later)
-    ("IF", r"\b(IF|if)\b"),
-    ("THEN", r"\b(THEN|then)\b"),
-    ("ELSE", r"\b(ELSE|else)\b"),
+    ("IS", r"\bis\b"),
 
-    ("AND", r"\b(AND|and)\b"),
-    ("OR", r"\b(OR|or)\b"),
-    ("NOT", r"\b(NOT|not)\b"),
+    ("IF", r"\bif\b"),
+    ("THEN", r"\bthen\b"),
+    ("ELSE", r"\belse\b"),
 
-    ("BOOLEAN", r"\b(true|false)\b"),
+    ("AND", r"\band\b"),
+    ("OR", r"\bor\b"),
+    ("NOT", r"\bnot\b"),
 
     # --------------------------
-    # PML1 Comparison keywords
+    # Boolean
     # --------------------------
-    ("EQ_KW", r"\b(EQ|eq)\b"),
-    ("NEQ_KW", r"\b(NEQ|neq)\b"),
-    ("LT_KW", r"\b(LT|lt)\b"),
-    ("GT_KW", r"\b(GT|gt)\b"),
-    ("LE_KW", r"\b(LE|le)\b"),
-    ("GE_KW", r"\b(GE|ge)\b"),
+    ("BOOLEAN", r"\btrue\b|\bfalse\b"),
 
-    # Multi-char operators
+    # --------------------------
+    # PML1 Keywords
+    # --------------------------
+    ("EQ_KW", r"\beq\b"),
+    ("NEQ_KW", r"\bneq\b"),
+    ("LT_KW", r"\blt\b"),
+    ("GT_KW", r"\bgt\b"),
+    ("LE_KW", r"\ble\b"),
+    ("GE_KW", r"\bge\b"),
+
+    # --------------------------
+    # Custom tokens
+    # --------------------------
+    ("COMMAND_VAR", r"\$\![a-zA-Z_]\w*"),
+    ("STRING_PIPE", r"\|[\s\S]*?\|"),
+    ("STRING", r"'[^']*'"),
+
+    # --------------------------
+    # Numbers
+    # --------------------------
+    ("NUMBER", r"\d+(\.\d+)?"),
+
+    # --------------------------
+    # Variables
+    # --------------------------
+    ("GLOBAL_VAR", r"!![a-zA-Z_]\w*"),
+    ("LOCAL_VAR", r"![a-zA-Z_]\w*"),
+
+    # --------------------------
+    # Operators (multi BEFORE single)
+    # --------------------------
     ("EQ", r"=="),
     ("NE", r"!="),
     ("GE", r">="),
     ("LE", r"<="),
-
-    ("DOT", r"\."),
 
     ("GT", r">"),
     ("LT", r"<"),
@@ -53,22 +77,28 @@ TOKEN_SPEC = [
     ("MINUS", r"-"),
     ("MUL", r"\*"),
     ("DIV", r"/"),
+    ("AMP", r"&"),
 
-    ("GLOBAL_VAR", r"!![a-zA-Z_]\w*"),
-    ("LOCAL_VAR", r"![a-zA-Z_]\w*"),
-
+    # --------------------------
+    # Symbols
+    # --------------------------
+    ("DOT", r"\."),
     ("LPAREN", r"\("),
     ("RPAREN", r"\)"),
-
     ("COMMA", r","),
 
     ("LBRACKET", r"\["),
     ("RBRACKET", r"\]"),
-    
+
     ("EQUAL", r"="),
 
+    # --------------------------
+    # Whitespace
+    # --------------------------
+    ("SKIP", r"[ \t\n]+"),
+
+    # ✅ ALWAYS LAST
     ("IDENTIFIER", r"[a-zA-Z_]\w*"),
-    ("SKIP", r"[ \t]+"),
 ]
 
 
@@ -78,7 +108,7 @@ TOKEN_REGEX = "|".join(f"(?P<{name}>{pattern})" for name, pattern in TOKEN_SPEC)
 def tokenize(code: str):
     tokens = []
 
-    for match in re.finditer(TOKEN_REGEX, code):
+    for match in re.finditer(TOKEN_REGEX, code, flags=re.IGNORECASE):
         kind = match.lastgroup
         value = match.group()
 
