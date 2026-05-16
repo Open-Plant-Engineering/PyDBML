@@ -834,8 +834,13 @@ class Parser:
                 # --------------------------
                 if self._peek() and self._peek().type == "INDICES":
                     self._consume_expected("INDICES")
-    
-                    iterable_token = self._consume_expected("LOCAL_VAR")
+
+                    token = self._peek()
+                    if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
+                        iterable_token = self._consume()
+                    else:
+                        raise SyntaxError(f"Expected variable, got {token}")
+
                     iterable = iterable_token.value.lstrip("!")
     
                     return self._parse_do_body(
@@ -849,8 +854,13 @@ class Parser:
                 # --------------------------
                 if self._peek() and self._peek().type == "VALUES":
                     self._consume_expected("VALUES")
-    
-                    iterable_token = self._consume_expected("LOCAL_VAR")
+
+                    token = self._peek()
+                    if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
+                        iterable_token = self._consume()
+                    else:
+                        raise SyntaxError(f"Expected variable after VALUES, got {token}")
+
                     iterable = iterable_token.value.lstrip("!")
     
                     return self._parse_do_body(
