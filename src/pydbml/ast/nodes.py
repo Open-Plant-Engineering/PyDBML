@@ -141,8 +141,9 @@ class MethodDefNode(ASTNode):
         self.params = params or []
 
 class CommandVarNode(ASTNode):
-    def __init__(self, name):
+    def __init__(self, name, is_global=False):
         self.name = name
+        self.is_global = is_global
         
 class PipeStringNode(ASTNode):
     def __init__(self, raw):

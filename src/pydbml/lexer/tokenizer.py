@@ -47,7 +47,7 @@ TOKEN_SPEC = [
     # --------------------------
     # Custom tokens
     # --------------------------
-    ("COMMAND_VAR", r"\$\![a-zA-Z_]\w*"),
+    ("COMMAND_VAR", r"\$\!\!?[a-zA-Z_][a-zA-Z0-9_]*"),
     ("STRING_PIPE", r"\|[\s\S]*?\|"),
     ("STRING", r"'[^']*'"),
 

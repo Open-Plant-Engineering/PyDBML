@@ -48,11 +48,16 @@ class ASTEvaluator:
             def replace_var(match):
                 expr = match.group(1)
 
+                is_global = expr.startswith("!")
+                expr = expr.lstrip("!")
+
                 parts = expr.split(".")
 
-                value = self.env.get(parts[0]).get()
+                if is_global:
+                    value = self.env.get_global(parts[0]).get()
+                else:
+                    value = self.env.get(parts[0]).get()
 
-                # ✅ support u.age
                 for attr in parts[1:]:
                     if isinstance(value, ObjectInstance):
                         value = value.value[attr]
@@ -61,22 +66,22 @@ class ASTEvaluator:
 
                 val = value.value if hasattr(value, "value") else value
 
-                # ✅ remove .0
                 if isinstance(val, float) and val.is_integer():
                     val = int(val)
 
                 return str(val)
 
-            text = re.sub(r"\$\!([a-zA-Z_][a-zA-Z0-9_.]*)", replace_var, text)
+            text = re.sub(r"\$\!(\!?[a-zA-Z_][a-zA-Z0-9_.]*)", replace_var, text)
 
             return String(text)
         
         if isinstance(node, CommandVarNode):
-            value = self.env.get(node.name).get()
-
-            debug("COMMAND VAR", f"{node.name} → {value}")
-
-            return value  # ✅ return AS-IS (no conversion)
+            if node.is_global:
+                value = self.env.get_global(node.name).get()
+            else:
+                value = self.env.get(node.name).get()
+            debug("COMMAND VAR", f"{node.name} → {value} (global={node.is_global})")
+            return value
         
         if isinstance(node, ObjectNode):
         

@@ -36,3 +36,22 @@ def test_command_var_concat():
     result = engine.execute("$!x & 'abc'")
 
     assert result.value == "10abc"
+
+
+def test_global_command_var():
+    engine = Engine()
+
+    engine.execute("!!x = 100")
+
+    result = engine.execute("$!!x")
+
+    assert result.value == 100
+
+def test_pipe_global_interpolation():
+    engine = Engine()
+
+    engine.execute("!!x = 50")
+
+    result = engine.execute("|Value is $!!x|")
+
+    assert result.value == "Value is 50"

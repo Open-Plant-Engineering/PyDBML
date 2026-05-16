@@ -149,8 +149,12 @@ class Parser:
             return PipeStringNode(raw)
 
         if token.type == "COMMAND_VAR":
-            name = token.value.replace("$!", "")
-            return CommandVarNode(name)
+            raw = token.value
+
+            is_global = raw.startswith("$!!")
+            name = raw.replace("$!!", "").replace("$!", "")
+
+            return CommandVarNode(name, is_global)
         
         # --------------------------
         # Boolean
