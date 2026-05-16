@@ -22,4 +22,8 @@ class FunctionLoader:
         parser = Parser(code)
         ast = parser.parse()
 
+        for node in ast:
+            if hasattr(node, "name"):
+                node.name = node.name.lower()
+
         return ast

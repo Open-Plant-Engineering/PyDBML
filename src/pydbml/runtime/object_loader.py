@@ -34,12 +34,14 @@ class ObjectLoader:
         for node in nodes:
 
             if isinstance(node, ObjectDefNode):
+                node.name = node.name.lower()
                 obj_def = node
 
             if isinstance(node, MethodDefNode):
-                if node.name not in methods:
-                    methods[node.name] = []
-                methods[node.name].append(node)
+                method_name = node.name.lower()
+                if method_name not in methods:
+                    methods[method_name] = []
+                methods[method_name].append(node)
 
         if not obj_def:
             raise Exception(f"No object definition found for {name}")

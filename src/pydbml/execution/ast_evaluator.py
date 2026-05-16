@@ -257,8 +257,19 @@ class ASTEvaluator:
                 instance = ObjectInstance(obj_def)
 
                 # ✅ call constructor if exists
-                if node.type_name in obj_def.methods:
-                    self._execute_method(instance, obj_def.methods[node.type_name], [])
+                method_name = node.type_name.lower()
+                
+                if method_name in obj_def.methods:
+                    methods = obj_def.methods[method_name]
+                
+                    if not isinstance(methods, list):
+                        methods = [methods]
+                
+                    # ✅ constructor must have 0 params
+                    for method in methods:
+                        if len(method.params) == 0:
+                            self._execute_method(instance, method, [])
+                            break
 
                 return instance
 
@@ -340,7 +351,7 @@ class ASTEvaluator:
             target = self.evaluate(node.target)
             args = [self.evaluate(arg) for arg in node.args]
 
-            method_name = node.method
+            method_name = node.method.lower()
 
             # --------------------------
             # ✅ Case 1: Object method
@@ -351,6 +362,10 @@ class ASTEvaluator:
                 if method_name in target.definition.methods:
                 
                     candidates = target.definition.methods[method_name]
+
+                    # ✅ normalize to list
+                    if not isinstance(candidates, list):
+                        candidates = [candidates]
 
                     # ✅ select by argument count
                     for method in candidates:

@@ -289,7 +289,7 @@ class Parser:
 
         if token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             is_global = token.type == "GLOBAL_VAR"
-            name = token.value.replace("!", "")
+            name = token.value.replace("!", "").lower()
 
             if token.type == "GLOBAL_VAR" and self._match("LPAREN"):
                 self._consume()  # (
@@ -326,7 +326,7 @@ class Parser:
                 if self._match("DOT"):
                     self._consume()
                     attr_token = self._consume()
-                    method_name = attr_token.value
+                    method_name = attr_token.value.lower()
 
                     # ✅ allow identifiers + all keyword-based methods
                     if attr_token.type not in (
@@ -383,7 +383,7 @@ class Parser:
                 if self._match("DOT"):
                     self._consume()
                     attr_token = self._consume()
-                    method_name = attr_token.value
+                    method_name = attr_token.value.lower()
         
                     if attr_token.type not in (
                         "IDENTIFIER",
@@ -644,7 +644,7 @@ class Parser:
         if name_token.type != "GLOBAL_VAR":
             raise SyntaxError("Function name must be global (!!)")
     
-        func_name = name_token.value.replace("!", "")
+        func_name = name_token.value.replace("!", "").lower()
     
         # --------------------------
         # Parse parameters
@@ -709,7 +709,7 @@ class Parser:
         self._consume_expected("OBJECT")
 
         name_token = self._consume()
-        obj_name = name_token.value.upper()
+        obj_name = name_token.value.lower()
 
         members = {}
 
@@ -752,7 +752,7 @@ class Parser:
         self._consume_expected("DOT")
     
         name_token = self._consume()
-        method_name = name_token.value
+        method_name = name_token.value.lower()
     
         # --------------------------
         # Parse parameters (currently empty)
