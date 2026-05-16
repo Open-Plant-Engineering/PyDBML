@@ -3,6 +3,9 @@ from pydbml.lexer.tokens import Token
 from pydbml.utils.debug import debug
 
 TOKEN_SPEC = [
+    
+    ("COMMENT_BLOCK", r"\$\([\s\S]*?\$\)"),
+    ("COMMENT_LINE", r"--.*"),
 
     # --------------------------
     # Keywords (MUST COME FIRST)
@@ -24,6 +27,7 @@ TOKEN_SPEC = [
     ("IF", r"\bif\b"),
     ("THEN", r"\bthen\b"),
     ("ELSE", r"\belse\b"),
+    ("ENDIF", r"\bendif\b"),
 
     ("AND", r"\band\b"),
     ("OR", r"\bor\b"),
@@ -95,7 +99,10 @@ TOKEN_SPEC = [
     # --------------------------
     # Whitespace
     # --------------------------
-    ("SKIP", r"[ \t\n]+"),
+    ("DO", r"\bdo\b"),
+    ("ENDDO", r"\benddo\b"),
+    ("BREAK", r"\bbreak\b"),
+    ("SKIP", r"\bskip\b"),
 
     # ✅ ALWAYS LAST
     ("IDENTIFIER", r"[a-zA-Z_]\w*"),
@@ -112,7 +119,7 @@ def tokenize(code: str):
         kind = match.lastgroup
         value = match.group()
 
-        if kind == "SKIP":
+        if kind in ("SKIP", "COMMENT_LINE", "COMMENT_BLOCK"):
             continue
 
         # ✅ normalize keywords

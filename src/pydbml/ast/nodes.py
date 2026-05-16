@@ -46,11 +46,12 @@ class BinaryOpNode(ASTNode):
 # --------------------------
 # IF Expression
 # --------------------------
-class IfNode(ASTNode):
-    def __init__(self, condition, then_branch, else_branch=None):
+class IfNode:
+    def __init__(self, condition, then_branch, else_branch=None, is_expression=False):
         self.condition = condition
         self.then_branch = then_branch
         self.else_branch = else_branch
+        self.is_expression = is_expression
 
 # --------------------------
 # Logical Operations
@@ -148,3 +149,14 @@ class CommandVarNode(ASTNode):
 class PipeStringNode(ASTNode):
     def __init__(self, raw):
         self.raw = raw
+
+class DoNode:
+    def __init__(self, body):
+        self.body = body
+
+class BreakNode:
+    pass
+
+class BreakIfNode:
+    def __init__(self, condition):
+        self.condition = condition

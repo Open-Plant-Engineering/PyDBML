@@ -23,9 +23,17 @@ class Engine:
         Execute a single line of PyDBML code.
         """
         parser = Parser(code)
-        ast = parser.parse()
         
         debug("CODE", code)
+        ast = parser.parse()
         debug("AST", ast)
+
+        result = None
+        if isinstance(ast, list):
+            for stmt in ast:
+                result = self.evaluator.evaluate(stmt)
+        else:
+            result = self.evaluator.evaluate(ast)
+
+        return result
         
-        return self.evaluator.evaluate(ast)

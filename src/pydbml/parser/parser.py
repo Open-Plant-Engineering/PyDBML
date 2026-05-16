@@ -18,6 +18,9 @@ from pydbml.ast.nodes import (
     ObjectDefNode,
     PipeStringNode,
     CommandVarNode,
+    DoNode,
+    BreakIfNode,
+    BreakNode,
 )
 
 
@@ -30,12 +33,27 @@ class Parser:
     # Entry
     # --------------------------
     def parse(self):
-        return self.statement()
+        statements = []
+        while not self._at_end():
+            statements.append(self.statement())
+        return statements
 
     # --------------------------
     # Statement
     # --------------------------
     def statement(self):
+        if self._match("BREAK"):
+            self._consume()
+
+            if self._match("IF"):
+                self._consume()
+                condition = self.expression()
+                return BreakIfNode(condition)
+
+            return BreakNode()
+        
+        if self._match("DO"):
+            return self._parse_do()
 
         if self._match("DEFINE"):
             # lookahead
@@ -55,7 +73,8 @@ class Parser:
             return self._parse_return()
 
         # ✅ DOT assignment FIRST (highest priority)
-        if self._peek().type in ("LOCAL_VAR", "GLOBAL_VAR"):
+        token = self._peek()
+        if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             if self._is_dot_assignment():
                 return self._parse_dot_assignment()
 
@@ -336,6 +355,9 @@ class Parser:
         return self.tokens[self.pos + 1]
 
     def _consume(self):
+        if self._at_end():
+            raise IndexError("Unexpected end of input")
+
         token = self.tokens[self.pos]
         self.pos += 1
         return token
@@ -351,25 +373,58 @@ class Parser:
         return False
     
     def _parse_if(self):
-        """
-        IF condition THEN expr ELSE expr
-        """
-    
-        self._consume_expected("IF")
-    
-        condition = self.expression()
-    
+        self._consume()  # IF
+
+        # --------------------------
+        # ✅ CONDITION (support both styles)
+        # --------------------------
+        if self._match("LPAREN"):
+            self._consume()
+            condition = self.expression()
+            self._consume_expected("RPAREN")
+        else:
+            condition = self.expression()
+
         self._consume_expected("THEN")
-    
-        then_branch = self.expression()
-    
+
+        # ✅ Always try expression IF first
+        # fallback to block IF if parsing fails
+        
+        # TRY expression IF
+        pos_backup = self.pos
+        
+        try:
+            then_expr = self.expression()
+            self._consume_expected("ELSE")
+            else_expr = self.expression()
+        
+            return IfNode(condition, then_expr, else_expr, is_expression=True)
+        
+        except Exception:
+            # rollback and parse as block IF
+            self.pos = pos_backup
+
+        # --------------------------
+        # ✅ BLOCK IF
+        # --------------------------
+        then_branch = []
+
+        while not self._at_end() and not self._match("ENDIF") and not self._match("ELSE"):
+            then_branch.append(self.statement())
+
         else_branch = None
-    
+
         if self._match("ELSE"):
-            self._consume()  # consume ELSE
-            else_branch = self.expression()
-    
-        return IfNode(condition, then_branch, else_branch)
+            self._consume()
+            else_branch = []
+
+            while not self._at_end() and not self._match("ENDIF"):
+                else_branch.append(self.statement())
+
+        # ✅ IMPORTANT — now ENDIF must exist
+        self._consume_expected("ENDIF")
+
+        return IfNode(condition, then_branch, else_branch, is_expression=False)
 
     def _parse_or(self):
         node = self._parse_and()
@@ -670,4 +725,28 @@ class Parser:
     
     def _at_end(self):
         return self.pos >= len(self.tokens)
+
+    def _parse_do(self):
+        self._consume()  # DO
+
+        body = []
+
+        while not self._match("ENDDO"):
+            if self._match("BREAK"):
+                self._consume()
+
+                if self._match("IF"):
+                    self._consume()
+                    condition = self.expression()
+                    body.append(BreakIfNode(condition))
+                else:
+                    body.append(BreakNode())
+
+                continue
+
+            body.append(self.statement())
+
+        self._consume_expected("ENDDO")
+
+        return DoNode(body)
 

@@ -6,6 +6,7 @@ from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
 from pydbml.execution.return_signal import ReturnSignal
+from pydbml.execution.signals import BreakSignal
 from pydbml.runtime.type_system import check_type
 from pydbml.runtime.object_loader import ObjectLoader
 from pydbml.ast.nodes import (
@@ -23,6 +24,9 @@ from pydbml.ast.nodes import (
     ReturnNode,
     PipeStringNode,
     CommandVarNode,
+    BreakNode,
+    BreakIfNode,
+    DoNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.lexer.tokenizer import tokenize
@@ -39,7 +43,34 @@ class ASTEvaluator:
             return None
 
         debug("NODE START", node)
+        if isinstance(node, list):
+            result = None
+            for stmt in node:
+                result = self.evaluate(stmt)
+            return result
 
+        if isinstance(node, DoNode):
+        
+            while True:
+                try:
+                    for stmt in node.body:
+                        self.evaluate(stmt)
+                except BreakSignal:
+                    break
+                
+            return None
+
+        if isinstance(node, BreakIfNode):
+            cond = self.evaluate(node.condition)
+
+            if isinstance(cond, Boolean) and cond.value:
+                raise BreakSignal()
+
+            return None
+
+        if isinstance(node, BreakNode):
+            raise BreakSignal()
+        
         if isinstance(node, PipeStringNode):
             text = node.raw
 
@@ -154,6 +185,9 @@ class ASTEvaluator:
             func_ast = loader.load(node.name)
 
             # ✅ Validate function structure
+            if isinstance(func_ast, list):
+                func_ast = func_ast[0]
+
             if not isinstance(func_ast, FunctionDefNode):
                 raise Exception(f"{node.name} is not a valid function")
 
@@ -376,20 +410,32 @@ class ASTEvaluator:
         # --------------------------
         if isinstance(node, IfNode):
             condition = self.evaluate(node.condition)
-
-            debug("IF CONDITION", condition)
-
+        
             if not isinstance(condition, Boolean):
-                raise TypeError("IF condition must evaluate to BOOLEAN")
-
+                raise TypeError("IF condition must be BOOLEAN")
+        
+            # ✅ Expression IF
+            if node.is_expression:
+                if condition.value:
+                    result = self.evaluate(node.then_branch)
+                else:
+                    result = self.evaluate(node.else_branch)
+        
+                return result
+        
+            # ✅ Block IF
             if condition.value:
-                debug("IF THEN EXECUTED", node.then_branch)
-                return self.evaluate(node.then_branch)
-
+                result = None
+                for stmt in node.then_branch:
+                    result = self.evaluate(stmt)
+                return result
+        
             if node.else_branch is not None:
-                debug("IF ELSE EXECUTED", node.else_branch)
-                return self.evaluate(node.else_branch)
-
+                result = None
+                for stmt in node.else_branch:
+                    result = self.evaluate(stmt)
+                return result
+        
             return None
 
         # --------------------------

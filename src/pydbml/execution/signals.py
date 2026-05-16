@@ -1,0 +1,2 @@
+class BreakSignal(Exception):
+    pass
