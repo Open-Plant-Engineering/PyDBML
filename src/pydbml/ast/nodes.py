@@ -151,8 +151,12 @@ class PipeStringNode(ASTNode):
         self.raw = raw
 
 class DoNode:
-    def __init__(self, body):
+    def __init__(self, body, var=None, start=None, end=None, step=None):
         self.body = body
+        self.var = var
+        self.start = start
+        self.end = end
+        self.step = step
 
 class BreakNode:
     pass

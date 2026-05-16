@@ -51,13 +51,39 @@ class ASTEvaluator:
 
         if isinstance(node, DoNode):
         
+            # ✅ simple infinite loop
+            if node.var is None:
+                while True:
+                    try:
+                        for stmt in node.body:
+                            self.evaluate(stmt)
+                    except BreakSignal:
+                        break
+                return None
+
+            # ✅ loop with variable
+            start_val = self.evaluate(node.start).value
+            end_val = self.evaluate(node.end).value
+            step_val = self.evaluate(node.step).value
+
+            i = start_val
+
             while True:
+                # ✅ loop condition (supports both directions)
+                if step_val > 0 and i > end_val:
+                    break
+                if step_val < 0 and i < end_val:
+                    break
+                
+                # ✅ assign loop variable
+                self.env.set(node.var, Number(i), is_global=False)
+
                 try:
                     for stmt in node.body:
                         self.evaluate(stmt)
                 except BreakSignal:
-                    break
-                
+                    break                
+                i += step_val
             return None
 
         if isinstance(node, BreakIfNode):
@@ -472,13 +498,17 @@ class ASTEvaluator:
         # Variable
         # --------------------------
         if node.__class__.__name__ == "VariableNode":
-            if node.is_global:
-                value = self.env.get_global(node.name).get()
-            else:
-                value = self.env.get(node.name).get()
-
+            try:
+                if node.is_global:
+                    value = self.env.get_global(node.name).get()
+                else:
+                    value = self.env.get(node.name).get()
+            except KeyError:
+                # ✅ auto initialize numeric variable
+                value = Number(0)
+                self.env.set(node.name, value, node.is_global)
+        
             debug("VARIABLE RESOLVE", f"{node.name} → {value}")
-
             return value
 
         # --------------------------

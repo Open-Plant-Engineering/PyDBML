@@ -22,6 +22,9 @@ TOKEN_SPEC = [
     ("METHOD", r"\bmethod\b"),
     ("ENDMETHOD", r"\bendmethod\b"),
 
+    ("FROM", r"\bfrom\b"),
+    ("TO", r"\bto\b"),
+    ("BY", r"\bby\b"),
     ("IS", r"\bis\b"),
 
     ("IF", r"\bif\b"),

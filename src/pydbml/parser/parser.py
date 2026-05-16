@@ -42,18 +42,55 @@ class Parser:
     # Statement
     # --------------------------
     def statement(self):
+        token = self._peek()
+        next_token = self._peek_next()
+
+        print("\n--- STATEMENT START ---")
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
+
+        # ✅ ✅ 1. ALWAYS HANDLE ASSIGNMENT FIRST (CRITICAL FIX)
+        if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
+            if next_token and next_token.type == "EQUAL":
+                print("✅ TAKING ASSIGNMENT PATH")
+                return self.assignment()
+
+        print("\n--- STATEMENT START ---")
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
+
+        # ✅ THEN other statements
         if self._match("BREAK"):
             self._consume()
 
             if self._match("IF"):
                 self._consume()
-                condition = self.expression()
+
+                if self._match("LPAREN"):
+                    self._consume()
+                    condition = self.expression()
+                    self._consume_expected("RPAREN")
+                else:
+                    condition = self.expression()
+
                 return BreakIfNode(condition)
 
             return BreakNode()
-        
+
+        print("\n--- STATEMENT START ---")
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
+
         if self._match("DO"):
             return self._parse_do()
+
+        print("\n--- STATEMENT START ---")
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
 
         if self._match("DEFINE"):
             # lookahead
@@ -63,17 +100,25 @@ class Parser:
             if self._peek_next() and self._peek_next().value.lower() == "object":
                 return self._parse_object_def()
 
-            # later: method
             if self._peek_next() and self._peek_next().value.lower() == "method":
                 return self._parse_method_def()
 
             raise SyntaxError("Unknown DEFINE type")
 
+        print("\n--- STATEMENT START ---")
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
+
         if self._match("RETURN"):
             return self._parse_return()
 
-        # ✅ DOT assignment FIRST (highest priority)
-        token = self._peek()
+        print("\n--- STATEMENT START ---")
+        print("POS:", self.pos)
+        print("TOKEN:", self._peek())
+        print("NEXT:", self._peek_next())
+
+        # ✅ dot/index AFTER assignment
         if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             if self._is_dot_assignment():
                 return self._parse_dot_assignment()
@@ -81,9 +126,7 @@ class Parser:
             if self._is_index_assignment():
                 return self._parse_index_assignment()
 
-            if self._peek_next() and self._peek_next().type == "EQUAL":
-                return self.assignment()
-
+        print("❌ FALLBACK TO EXPRESSION")
         return self.expression()
 
     # --------------------------
@@ -151,6 +194,13 @@ class Parser:
         return node
 
     def _parse_factor(self):
+        # ✅ FIX: handle unary minus FIRST
+        if self._match("MINUS"):
+            self._consume()
+            operand = self._parse_factor()
+            return BinaryOpNode(NumberNode(0), "-", operand)
+
+        # existing logic
         node = self._parse_primary()
 
         while self._match("MUL", "DIV"):
@@ -727,26 +777,54 @@ class Parser:
         return self.pos >= len(self.tokens)
 
     def _parse_do(self):
+
+        print("\n--- DO LOOP BODY ---")
+        print("POS:", self.pos)
+        print("NEXT TOKEN:", self._peek())
+
         self._consume()  # DO
 
-        body = []
+        var = None
+        start = None
+        end = None
+        step = None
 
-        while not self._match("ENDDO"):
-            if self._match("BREAK"):
+        # --------------------------
+        # ✅ CASE: do !i ...
+        # --------------------------
+        # ✅ ONLY treat as loop variable if followed by TO / FROM
+        if self._match("LOCAL_VAR") and self._peek_next() and self._peek_next().type in ("TO", "FROM"):
+        
+            var_token = self._consume()
+            var = var_token.value.replace("!", "")
+        
+            if self._match("TO"):
                 self._consume()
-
-                if self._match("IF"):
+                start = NumberNode(1.0)
+                end = self.expression()
+                step = NumberNode(1.0)
+        
+            elif self._match("FROM"):
+                self._consume()
+                start = self.expression()
+        
+                self._consume_expected("TO")
+                end = self.expression()
+        
+                if self._match("BY"):
                     self._consume()
-                    condition = self.expression()
-                    body.append(BreakIfNode(condition))
+                    step = self.expression()
                 else:
-                    body.append(BreakNode())
+                    step = NumberNode(1.0)
 
-                continue
-
-            body.append(self.statement())
+        # ✅ fallback: infinite loop
+        body = []
+        while not self._at_end() and not self._match("ENDDO"):
+            stmt = self.statement()
+            if stmt is not None:
+                body.append(stmt)
 
         self._consume_expected("ENDDO")
 
-        return DoNode(body)
+        return DoNode(body, var=var, start=start, end=end, step=step)
 
