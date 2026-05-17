@@ -494,7 +494,7 @@ class ASTEvaluator:
                         return value
 
                     # ✅ attributes allowed
-                    return value
+                    return self._to_pydbml(value)
 
             # ✅ Other LOGIC
             debug("DOT ACCESS", f"{obj}.{node.attribute}")

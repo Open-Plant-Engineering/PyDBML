@@ -17,7 +17,9 @@ class Array(PyDBMLType):
             raise ValueError("Array index starts from 1")
 
         if not isinstance(item, PyDBMLType):
-            raise TypeError("Array value must be PyDBMLType")
+            # ✅ allow plugin objects
+            if not hasattr(item, "__class__"):
+                raise TypeError("Array value must be valid type")
         
         debug("ARRAY SET", f"index={index}, value={item}")
         debug("ARRAY STATE", self.value)
