@@ -19,3 +19,19 @@ class MyClass:
 @pydbml_function
 def multiply(a, b):
     return a * b
+
+@pydbml_function
+def get_dict():
+    return {1: 100, 2: 200}
+
+@pydbml_function
+def get_list():
+    return [10, 20, 30]
+
+@pydbml_function
+def get_nested():
+    return {1: [1, 2], 2: [3, 4]}
+
+@pydbml_function
+def check():
+    return True

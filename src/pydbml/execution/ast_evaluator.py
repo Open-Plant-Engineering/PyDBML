@@ -786,28 +786,37 @@ class ASTEvaluator:
         self.registry.register_module(module)
 
     def _to_python(self, value):
-        from pydbml.types.primitives import Number, String, Boolean
-
         if isinstance(value, Number):
             return value.value
         if isinstance(value, String):
             return value.value
         if isinstance(value, Boolean):
             return value.value
-        if isinstance(value, list):
-            return [self._to_python(v) for v in value]
-
+        if isinstance(value, Array):
+            return {
+                k: self._to_python(v)
+                for k, v in value.value.items()
+            }
         return value
 
-
     def _to_pydbml(self, value):
-        from pydbml.types.primitives import Number, String, Boolean
-
         if isinstance(value, bool):
             return Boolean(value)
         if isinstance(value, int) or isinstance(value, float):
             return Number(float(value))
         if isinstance(value, str):
             return String(value)
+        if isinstance(value, list):
+            arr = Array()
+            for i, v in enumerate(value, 1):  # ✅ 1-based index
+                arr.set(i, self._to_pydbml(v))
+            return arr
+
+        # ✅ ✅ handle dict (keep too)
+        if isinstance(value, dict):
+            arr = Array()
+            for k, v in value.items():
+                arr.set(int(k), self._to_pydbml(v))
+            return arr
 
         return value
