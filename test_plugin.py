@@ -65,10 +65,27 @@ class Vec:
     def __init__(self, x):
         self.x = x
 
+    @pydbml_method
     @pydbml_operator("+")
     def add(self, other):
         return Vec(self.x + other.x)
-    
+
+    @pydbml_method
     @pydbml_operator(">")
     def gt(self, other):
         return self.x > other.x
+
+    @pydbml_method
+    @pydbml_operator("*")
+    def mul(self, other):
+        return Vec(self.x * other.x)
+
+    @pydbml_method
+    @pydbml_operator("<")
+    def lt(self, other):
+        return self.x < other.x
+
+    # ✅ only method (NOT operator)
+    @pydbml_method
+    def eq(self, other):
+        return self.x == other.x

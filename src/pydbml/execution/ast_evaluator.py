@@ -728,7 +728,9 @@ class ASTEvaluator:
                     result = method(py_right)
 
                     return self._to_pydbml(result)
-
+                
+                raise Exception(f"Operator '{node.op}' not supported for {cls_name}")
+            
             # =====================================================
             # ✅ FALLBACK: existing logic continues below
             # =====================================================
