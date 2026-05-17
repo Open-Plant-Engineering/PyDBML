@@ -802,21 +802,25 @@ class ASTEvaluator:
     def _to_pydbml(self, value):
         if isinstance(value, bool):
             return Boolean(value)
-        if isinstance(value, int) or isinstance(value, float):
+        if isinstance(value, (int, float)):
             return Number(float(value))
         if isinstance(value, str):
             return String(value)
-        if isinstance(value, list):
+        if isinstance(value, (list, tuple)):
             arr = Array()
-            for i, v in enumerate(value, 1):  # ✅ 1-based index
+            for i, v in enumerate(value, 1):   # ✅ correct
                 arr.set(i, self._to_pydbml(v))
             return arr
-
-        # ✅ ✅ handle dict (keep too)
+        if isinstance(value, set):
+            value = list(value)
         if isinstance(value, dict):
             arr = Array()
             for k, v in value.items():
-                arr.set(int(k), self._to_pydbml(v))
+                try:
+                    idx = int(k)
+                except Exception:
+                    raise TypeError("Dict keys must be convertible to int for Array")
+                arr.set(idx, self._to_pydbml(v))
             return arr
 
         return value

@@ -63,3 +63,24 @@ def test_boolean_conversion():
 
     assert result.value is True
 
+def test_python_tuple_to_array():
+    e = Engine()
+
+    e.execute("import |test_plugin|")
+
+    e.execute("!x = !!get_tuple()")
+
+    result = e.execute("!x[2]")
+
+    assert result.value == 20
+
+def test_nested_tuple_conversion():
+    e = Engine()
+
+    e.execute("import |test_plugin|")
+
+    e.execute("!x = !!get_nested_tuple()")
+
+    result = e.execute("!x[2][1]")
+
+    assert result.value == 3

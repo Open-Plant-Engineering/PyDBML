@@ -35,3 +35,11 @@ def get_nested():
 @pydbml_function
 def check():
     return True
+
+@pydbml_function
+def get_tuple():
+    return (10, 20, 30)
+
+@pydbml_function
+def get_nested_tuple():
+    return {1: (1, 2), 2: (3, 4)}
