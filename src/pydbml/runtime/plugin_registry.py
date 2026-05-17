@@ -4,6 +4,7 @@ class PluginRegistry:
     def __init__(self):
         self.classes = {}
         self.functions = {}
+        self.operators = {}
 
     def register_module(self, module):
         for name in dir(module):
@@ -12,5 +13,13 @@ class PluginRegistry:
             if hasattr(obj, "_pydbml_class"):
                 self.classes[name.lower()] = obj
 
+                # ✅ scan class methods for operators
+                for attr in dir(obj):
+                    method = getattr(obj, attr)
+                    if hasattr(method, "_pydbml_operator"):
+                        op = method._pydbml_operator
+                        self.operators[(name.lower(), op)] = attr
+
+            # ✅ function
             if hasattr(obj, "_pydbml_function"):
                 self.functions[name.lower()] = obj

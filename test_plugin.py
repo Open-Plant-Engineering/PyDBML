@@ -1,4 +1,4 @@
-from pydbml.plugins import pydbml_class, pydbml_method, pydbml_function
+from pydbml.plugins import pydbml_class, pydbml_method, pydbml_function, pydbml_operator
 
 @pydbml_class
 class MyClass:
@@ -57,3 +57,18 @@ def get_nested_set():
 @pydbml_function
 def get_mixed():
     return [1, {10, 20}, (30, 40)]
+
+
+
+@pydbml_class
+class Vec:
+    def __init__(self, x):
+        self.x = x
+
+    @pydbml_operator("+")
+    def add(self, other):
+        return Vec(self.x + other.x)
+    
+    @pydbml_operator(">")
+    def gt(self, other):
+        return self.x > other.x

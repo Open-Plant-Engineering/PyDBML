@@ -272,7 +272,7 @@ class ASTEvaluator:
 
             if type_name in self.registry.classes:
                 py_class = self.registry.classes[type_name]
-                args = [self.evaluate(arg) for arg in node.args]
+                args = [self._to_python(self.evaluate(arg)) for arg in node.args]
                 instance = py_class(*args)
                 return instance
 
@@ -433,7 +433,7 @@ class ASTEvaluator:
                             method = getattr(target, attr)
                             break
                     if method:
-                        if not hasattr(method, "_pydbml_method"):
+                        if not hasattr(method, "_pydbml_method") and not hasattr(method, "_pydbml_operator"):
                             raise RuntimeError("Method not exposed")
 
                         py_args = [self._to_python(a) for a in args]
@@ -705,6 +705,33 @@ class ASTEvaluator:
             debug("BINOP LEFT", left)
             debug("BINOP RIGHT", right)
             debug("BINOP OP", node.op)
+
+            # =====================================================
+            # ✅ PLUGIN OPERATOR SUPPORT (ADD THIS BLOCK)
+            # =====================================================
+            if not isinstance(left, (Number, String, Boolean)):
+                cls_name = type(left).__name__.lower()
+
+                key = (cls_name, node.op)
+
+                if key in self.registry.operators:
+                    method_name = self.registry.operators[key]
+
+                    method = getattr(left, method_name)
+
+                    if not hasattr(method, "_pydbml_operator"):
+                        raise RuntimeError("Operator not exposed")
+
+                    # ✅ convert right side
+                    py_right = self._to_python(right)
+
+                    result = method(py_right)
+
+                    return self._to_pydbml(result)
+
+            # =====================================================
+            # ✅ FALLBACK: existing logic continues below
+            # =====================================================
 
             if node.op == "+":
                 return Number(left.value + right.value)

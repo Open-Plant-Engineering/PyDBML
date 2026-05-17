@@ -18,3 +18,10 @@ def pydbml_member(func):
 def pydbml_function(func):
     func._pydbml_function = True
     return func
+
+
+def pydbml_operator(symbol):
+    def wrapper(func):
+        func._pydbml_operator = symbol
+        return func
+    return wrapper
