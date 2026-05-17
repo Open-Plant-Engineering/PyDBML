@@ -800,27 +800,29 @@ class ASTEvaluator:
         return value
 
     def _to_pydbml(self, value):
+        # ✅ primitives FIRST
         if isinstance(value, bool):
             return Boolean(value)
         if isinstance(value, (int, float)):
             return Number(float(value))
         if isinstance(value, str):
             return String(value)
-        if isinstance(value, (list, tuple)):
-            arr = Array()
-            for i, v in enumerate(value, 1):   # ✅ correct
-                arr.set(i, self._to_pydbml(v))
-            return arr
-        if isinstance(value, set):
-            value = list(value)
+        # ✅ dict FIRST (important)
         if isinstance(value, dict):
             arr = Array()
             for k, v in value.items():
                 try:
                     idx = int(k)
                 except Exception:
-                    raise TypeError("Dict keys must be convertible to int for Array")
-                arr.set(idx, self._to_pydbml(v))
+                    raise TypeError("Dict keys must be convertible to int")
+
+                arr.set(idx, self._to_pydbml(v))  # ✅ recursive
+            return arr
+        # ✅ list / tuple / set AFTER dict
+        if isinstance(value, (list, tuple, set)):
+            arr = Array()
+            for i, v in enumerate(value, 1):   # ✅ enumerate ONLY
+                arr.set(i, self._to_pydbml(v)) # ✅ recursive
             return arr
 
         return value
