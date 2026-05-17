@@ -44,8 +44,6 @@ def get_tuple():
 def get_nested_tuple():
     return {1: (1, 2), 2: (3, 4)}
 
-from pydbml.plugins import pydbml_function
-
 @pydbml_function
 def get_set():
     return {10, 20, 30}
@@ -57,7 +55,6 @@ def get_nested_set():
 @pydbml_function
 def get_mixed():
     return [1, {10, 20}, (30, 40)]
-
 
 
 @pydbml_class
