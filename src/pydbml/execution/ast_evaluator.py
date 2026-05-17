@@ -425,16 +425,19 @@ class ASTEvaluator:
             # --------------------------
             # ✅ Object method From Python
             # --------------------------
-            if not isinstance(target, ObjectInstance) and not isinstance(target, Array):
+            if not isinstance(target, (ObjectInstance, Array)):
                 if hasattr(target, "__class__"):
-                    method = getattr(target, method_name, None)
+                    method = None
+                    for attr in dir(target):
+                        if attr.lower() == method_name:
+                            method = getattr(target, attr)
+                            break
                     if method:
                         if not hasattr(method, "_pydbml_method"):
                             raise RuntimeError("Method not exposed")
 
                         py_args = [self._to_python(a) for a in args]
                         result = method(*py_args)
-
                         return self._to_pydbml(result)
 
             # --------------------------
@@ -471,10 +474,19 @@ class ASTEvaluator:
         if isinstance(node, DotAccessNode):
             obj = self.evaluate(node.target)
 
-            # ✅ PLUGIN OBJECT SUPPORT
+            # ✅ PLUGIN OBJECT SUPPORT (case-insensitive)
             if not isinstance(obj, ObjectInstance):
-                if hasattr(obj, node.attribute):
-                    value = getattr(obj, node.attribute)
+            
+                attr_name = node.attribute.lower()
+                real_attr = None
+
+                for attr in dir(obj):
+                    if attr.lower() == attr_name:
+                        real_attr = attr
+                        break
+                    
+                if real_attr is not None:
+                    value = getattr(obj, real_attr)
 
                     # ✅ methods allowed (checked later)
                     if callable(value):
