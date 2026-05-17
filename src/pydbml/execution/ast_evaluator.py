@@ -31,22 +31,31 @@ from pydbml.ast.nodes import (
     SkipIfNode,
     ObjectDefNode,
     MethodDefNode,
+    ImportNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.lexer.tokenizer import tokenize
 from pydbml.utils.debug import debug
+import importlib
+import importlib.util
+from pydbml.runtime.plugin_registry import PluginRegistry
 
 
 class ASTEvaluator:
     def __init__(self, env, resolver=None):
         self.env = env
         self.resolver = resolver
+        self.registry = PluginRegistry()
 
     def evaluate(self, node):
         if node is None:
             return None
 
         debug("NODE START", node)
+        
+        if isinstance(node, ImportNode):
+            return self.eval_import(node)
+
         if isinstance(node, SkipIfNode):
         
             # ✅ standalone skip
@@ -257,7 +266,16 @@ class ASTEvaluator:
             return value
         
         if isinstance(node, ObjectNode):
-        
+
+            # ✅ PLUGIN HOOK
+            type_name = node.type_name.lower()
+
+            if type_name in self.registry.classes:
+                py_class = self.registry.classes[type_name]
+                args = [self.evaluate(arg) for arg in node.args]
+                instance = py_class(*args)
+                return instance
+
             if node.type_name == "array":
                 return Array()
 
@@ -330,7 +348,17 @@ class ASTEvaluator:
                 return r.value
             
         if isinstance(node, FunctionCallNode):
-        
+
+            name = node.name.lower()
+
+            if name in self.registry.functions:
+                func = self.registry.functions[name]
+
+                py_args = [self._to_python(self.evaluate(a)) for a in node.args]
+                result = func(*py_args)
+
+                return self._to_pydbml(result)
+
             loader = FunctionLoader(self.resolver)
             func_ast = loader.load(node.name)
 
@@ -395,6 +423,21 @@ class ASTEvaluator:
             method_name = node.method.lower()
 
             # --------------------------
+            # ✅ Object method From Python
+            # --------------------------
+            if not isinstance(target, ObjectInstance) and not isinstance(target, Array):
+                if hasattr(target, "__class__"):
+                    method = getattr(target, method_name, None)
+                    if method:
+                        if not hasattr(method, "_pydbml_method"):
+                            raise RuntimeError("Method not exposed")
+
+                        py_args = [self._to_python(a) for a in args]
+                        result = method(*py_args)
+
+                        return self._to_pydbml(result)
+
+            # --------------------------
             # ✅ Case 1: Object method
             # --------------------------
             if isinstance(target, ObjectInstance):
@@ -428,6 +471,19 @@ class ASTEvaluator:
         if isinstance(node, DotAccessNode):
             obj = self.evaluate(node.target)
 
+            # ✅ PLUGIN OBJECT SUPPORT
+            if not isinstance(obj, ObjectInstance):
+                if hasattr(obj, node.attribute):
+                    value = getattr(obj, node.attribute)
+
+                    # ✅ methods allowed (checked later)
+                    if callable(value):
+                        return value
+
+                    # ✅ attributes allowed
+                    return value
+
+            # ✅ Other LOGIC
             debug("DOT ACCESS", f"{obj}.{node.attribute}")
 
             # ✅ ObjectInstance
@@ -441,7 +497,6 @@ class ASTEvaluator:
 
                 raise KeyError(f"Attribute '{node.attribute}' not found")
 
-            # ✅ Primitive / Array support (fallback)
             if hasattr(obj, "value"):
             
                 if isinstance(obj.value, dict) and node.attribute in obj.value:
@@ -704,3 +759,43 @@ class ASTEvaluator:
 
         finally:
             self.env.pop_scope()
+
+    def eval_import(self, node):
+        path = node.path
+
+        # ✅ file path
+        if path.endswith(".py") or "/" in path or "\\" in path:
+            spec = importlib.util.spec_from_file_location("plugin_mod", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        else:
+            module = importlib.import_module(path)
+
+        self.registry.register_module(module)
+
+    def _to_python(self, value):
+        from pydbml.types.primitives import Number, String, Boolean
+
+        if isinstance(value, Number):
+            return value.value
+        if isinstance(value, String):
+            return value.value
+        if isinstance(value, Boolean):
+            return value.value
+        if isinstance(value, list):
+            return [self._to_python(v) for v in value]
+
+        return value
+
+
+    def _to_pydbml(self, value):
+        from pydbml.types.primitives import Number, String, Boolean
+
+        if isinstance(value, bool):
+            return Boolean(value)
+        if isinstance(value, int) or isinstance(value, float):
+            return Number(float(value))
+        if isinstance(value, str):
+            return String(value)
+
+        return value

@@ -102,6 +102,7 @@ TOKEN_SPEC = [
     # --------------------------
     # Whitespace
     # --------------------------
+    ("IMPORT", r"import"),
     ("DO", r"\bdo\b"),
     ("ENDDO", r"\benddo\b"),
     ("BREAK", r"\bbreak\b"),

@@ -23,6 +23,7 @@ from pydbml.ast.nodes import (
     BreakNode,
     ObjectNode,
     SkipIfNode,
+    ImportNode,
 )
 from pydbml.utils.debug import debug
 
@@ -47,6 +48,19 @@ class Parser:
         token = self._peek()
         next_token = self._peek_next()
 
+        # --------------------------
+        # ✅ IMPORT handling
+        # --------------------------
+        if self._match("IMPORT"):
+            self._consume()
+
+            token = self._consume()
+            if token.type != "STRING_PIPE":
+                raise SyntaxError("Expected |module_or_path|")
+
+            raw = token.value[1:-1]
+            return ImportNode(raw)
+        
         # --------------------------
         # ✅ SKIP handling
         # --------------------------

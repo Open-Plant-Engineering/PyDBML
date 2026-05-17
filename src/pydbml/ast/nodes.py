@@ -174,3 +174,7 @@ class BreakIfNode:
 class SkipIfNode:
     def __init__(self, condition):
         self.condition = condition
+
+class ImportNode:
+    def __init__(self, path):
+        self.path = path
