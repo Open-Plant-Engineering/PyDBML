@@ -356,8 +356,8 @@ class ASTEvaluator:
 
                 py_args = [self._to_python(self.evaluate(a)) for a in node.args]
                 result = func(*py_args)
-
-                return self._to_pydbml(result)
+                converted = self._to_pydbml(result)
+                return converted
 
             loader = FunctionLoader(self.resolver)
             func_ast = loader.load(node.name)
@@ -438,7 +438,8 @@ class ASTEvaluator:
 
                         py_args = [self._to_python(a) for a in args]
                         result = method(*py_args)
-                        return self._to_pydbml(result)
+                        converted = self._to_pydbml(result)
+                        return converted
 
             # --------------------------
             # ✅ Case 1: Object method
@@ -575,6 +576,9 @@ class ASTEvaluator:
         if isinstance(node, IndexAccessNode):
             array_obj = self.evaluate(node.target)
             index = int(self.evaluate(node.index).value)
+
+            if isinstance(array_obj, list):
+                return self._to_pydbml(array_obj[index - 1])
         
             return array_obj.get(index)
 
