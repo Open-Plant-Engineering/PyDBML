@@ -9,7 +9,6 @@ from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
 from pydbml.execution.return_signal import ReturnSignal
 from pydbml.execution.signals import BreakSignal, ContinueSignal
-from pydbml.runtime.type_system import check_type
 from pydbml.runtime.object_loader import ObjectLoader
 from pydbml.runtime.variable import Variable
 from pydbml.ast.nodes import (
@@ -420,34 +419,32 @@ class ASTEvaluator:
         if isinstance(node, CallNode):
         
             target = self.evaluate(node.target)
-            if isinstance(target, PluginObject):
-                target = target.obj
-
             args = [self.evaluate(arg) for arg in node.args]
             method_name = node.method.lower()
 
             # --------------------------
-            # ✅ Object method From Python
+            # ✅ Plugin object method From Python
             # --------------------------
             if not isinstance(target, (ObjectInstance, Array, Number, String, Boolean)):
-                if hasattr(target, "__class__"):
-                    method = None
-                    for attr in dir(target):
-                        if attr.lower() == method_name:
-                            method = getattr(target, attr)
-                            break
-                    if method:
-                        if not hasattr(method, "_pydbml_method") and not hasattr(method, "_pydbml_operator"):
-                            raise RuntimeError("Method not exposed")
-
-                        py_args = [self._to_python(a) for a in args]
-                        result = method(*py_args)
-                        converted = self._to_pydbml(result)
-                        return converted
+                method = None
+                for attr in dir(target):
+                    if attr.lower() == method_name:
+                        method = getattr(target, attr)
+                        break
                     
-                    raise Exception(
-                        f"Method '{method_name}' not found on plugin object '{type(target).__name__}'"
-                    )
+                if method:
+                    if not hasattr(method, "_pydbml_method") and not hasattr(method, "_pydbml_operator"):
+                        raise RuntimeError("Method not exposed")
+
+                    py_args = [self._to_python(a) for a in args]
+                    result = method(*py_args)
+
+                    return self._to_pydbml(result)
+
+                raise Exception(
+                    f"Method '{method_name}' not found on plugin object '{type(target).__name__}'"
+                )
+
             # --------------------------
             # ✅ Case 1: Object method
             # --------------------------
@@ -484,11 +481,11 @@ class ASTEvaluator:
             
             if isinstance(obj, PluginObject):
                 obj = obj.obj
-        
+
+            attr_name = node.attribute.lower()
+
             # ✅ PLUGIN OBJECT SUPPORT (case-insensitive)
             if not isinstance(obj, ObjectInstance):
-            
-                attr_name = node.attribute.lower()
                 real_attr = None
 
                 for attr in dir(obj):
@@ -520,9 +517,11 @@ class ASTEvaluator:
 
                 raise KeyError(f"Attribute '{node.attribute}' not found")
 
-            if hasattr(obj, "value"):
-            
-                if isinstance(obj.value, dict) and node.attribute in obj.value:
+            # --------------------------
+            # ✅ Array supports dot access (IMPORTANT FIX)
+            # --------------------------
+            if isinstance(obj, Array):
+                if node.attribute in obj.value:
                     return self._to_pydbml(obj.value[node.attribute])
 
             raise TypeError("Dot access not supported for this type")
@@ -885,7 +884,7 @@ class ASTEvaluator:
         if isinstance(value, PluginObject):
             return value
         
-        if not isinstance(value, PyDBMLType) and hasattr(value, "__class__"):
+        if not isinstance(value, PyDBMLType) and not isinstance(value, (int, float, bool, str, dict, list, tuple, set, type(None))):
             return PluginObject(value)
-        
+
         return value
