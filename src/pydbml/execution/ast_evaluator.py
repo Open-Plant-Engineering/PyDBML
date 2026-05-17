@@ -2,6 +2,8 @@ import re
 from pydbml.types.primitives import Number, String, Boolean
 from pydbml.types.array import Array
 from pydbml.types.object import ObjectInstance
+from pydbml.types.plugin_object import PluginObject
+from pydbml.types.base import PyDBMLType
 from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
@@ -418,14 +420,16 @@ class ASTEvaluator:
         if isinstance(node, CallNode):
         
             target = self.evaluate(node.target)
-            args = [self.evaluate(arg) for arg in node.args]
+            if isinstance(target, PluginObject):
+                target = target.obj
 
+            args = [self.evaluate(arg) for arg in node.args]
             method_name = node.method.lower()
 
             # --------------------------
             # ✅ Object method From Python
             # --------------------------
-            if not isinstance(target, (ObjectInstance, Array)):
+            if not isinstance(target, (ObjectInstance, Array, Number, String, Boolean)):
                 if hasattr(target, "__class__"):
                     method = None
                     for attr in dir(target):
@@ -440,7 +444,10 @@ class ASTEvaluator:
                         result = method(*py_args)
                         converted = self._to_pydbml(result)
                         return converted
-
+                    
+                    raise Exception(
+                        f"Method '{method_name}' not found on plugin object '{type(target).__name__}'"
+                    )
             # --------------------------
             # ✅ Case 1: Object method
             # --------------------------
@@ -474,7 +481,10 @@ class ASTEvaluator:
         # --------------------------
         if isinstance(node, DotAccessNode):
             obj = self.evaluate(node.target)
-
+            
+            if isinstance(obj, PluginObject):
+                obj = obj.obj
+        
             # ✅ PLUGIN OBJECT SUPPORT (case-insensitive)
             if not isinstance(obj, ObjectInstance):
             
@@ -503,7 +513,7 @@ class ASTEvaluator:
             if isinstance(obj, ObjectInstance):
             
                 if node.attribute in obj.value:
-                    return obj.value[node.attribute]
+                    return self._to_pydbml(obj.value[node.attribute])
 
                 if node.attribute in obj.definition.methods:
                     return ("__method__", obj, node.attribute)
@@ -513,7 +523,7 @@ class ASTEvaluator:
             if hasattr(obj, "value"):
             
                 if isinstance(obj.value, dict) and node.attribute in obj.value:
-                    return obj.value[node.attribute]
+                    return self._to_pydbml(obj.value[node.attribute])
 
             raise TypeError("Dot access not supported for this type")
 
@@ -702,6 +712,13 @@ class ASTEvaluator:
             left = self.evaluate(node.left)
             right = self.evaluate(node.right)
 
+            # ✅ unwrap plugin objects
+            if isinstance(left, PluginObject):
+                left = left.obj
+
+            if isinstance(right, PluginObject):
+                right = right.obj
+
             debug("BINOP LEFT", left)
             debug("BINOP RIGHT", right)
             debug("BINOP OP", node.op)
@@ -821,6 +838,8 @@ class ASTEvaluator:
         self.registry.register_module(module)
 
     def _to_python(self, value):
+        if isinstance(value, PluginObject):
+            return value.obj
         if isinstance(value, Number):
             return value.value
         if isinstance(value, String):
@@ -835,6 +854,9 @@ class ASTEvaluator:
         return value
 
     def _to_pydbml(self, value):
+        if value is None:
+            return None
+
         # ✅ primitives FIRST
         if isinstance(value, bool):
             return Boolean(value)
@@ -859,5 +881,11 @@ class ASTEvaluator:
             for i, v in enumerate(value, 1):   # ✅ enumerate ONLY
                 arr.set(i, self._to_pydbml(v)) # ✅ recursive
             return arr
-
+        
+        if isinstance(value, PluginObject):
+            return value
+        
+        if not isinstance(value, PyDBMLType) and hasattr(value, "__class__"):
+            return PluginObject(value)
+        
         return value
