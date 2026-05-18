@@ -32,6 +32,12 @@ TOKEN_SPEC = [
     ("ELSE", r"\belse\b"),
     ("ENDIF", r"\bendif\b"),
 
+    ("HANDLE", r"\bhandle\b"),
+    ("ELSEHANDLE", r"\belsehandle\b"),
+    ("ANY", r"\bany\b"),
+    ("NONE", r"\bnone\b"),
+    ("ENDHANDLE", r"\bendhandle\b"),
+
     ("AND", r"\band\b"),
     ("OR", r"\bor\b"),
     ("NOT", r"\bnot\b"),

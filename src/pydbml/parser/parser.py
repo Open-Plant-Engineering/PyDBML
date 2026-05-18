@@ -59,7 +59,7 @@ class Parser:
                 raise SyntaxError("Expected |module_or_path|")
 
             raw = token.value[1:-1]
-            return ImportNode(raw)
+            return self._attach_handle(ImportNode(raw))
         
         # --------------------------
         # ✅ SKIP handling
@@ -78,10 +78,10 @@ class Parser:
                 else:
                     condition = self.expression()
         
-                return SkipIfNode(condition)
+                return self._attach_handle(SkipIfNode(condition))
         
             # ✅ standalone skip
-            return SkipIfNode(None)
+            return self._attach_handle(SkipIfNode(None))
         
         # --------------------------
         # ✅ BREAK handling
@@ -100,10 +100,10 @@ class Parser:
                 else:
                     condition = self.expression()
         
-                return BreakIfNode(condition)
+                return self._attach_handle(BreakIfNode(condition))
         
             # ✅ standalone break
-            return BreakNode()        
+            return self._attach_handle(BreakNode())
         
         if self._match("IF"):
             pos_backup = self.pos
@@ -118,28 +118,28 @@ class Parser:
                 condition = self.expression()
         
             if not self._match("THEN"):
-                return SkipIfNode(condition)
+                return self._attach_handle(SkipIfNode(condition))
         
             self.pos = pos_backup
 
         if self._match("DO"):
-            return self._parse_do()
+            return self._attach_handle(self._parse_do())
 
         if self._match("DEFINE"):
             # lookahead
             if self._peek_next() and self._peek_next().value.lower() == "function":
-                return self._parse_function_def()
+                return self._attach_handle(self._parse_function_def())
 
             if self._peek_next() and self._peek_next().value.lower() == "object":
-                return self._parse_object_def()
+                return self._attach_handle(self._parse_object_def())
 
             if self._peek_next() and self._peek_next().value.lower() == "method":
-                return self._parse_method_def()
+                return self._attach_handle(self._parse_method_def())
 
             raise SyntaxError("Unknown DEFINE type")
 
         if self._match("RETURN"):
-            return self._parse_return()
+            return self._attach_handle(self._parse_return())
 
         # ✅ assignment detection (variable, index, dot)
         if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
@@ -182,21 +182,22 @@ class Parser:
                 value = self.expression()
 
                 if isinstance(left, VariableNode):
-                    return AssignNode(left.name, value, left.is_global)
+                    return self._attach_handle(AssignNode(left.name, value, left.is_global))
 
                 if isinstance(left, IndexAccessNode):
-                    return IndexAssignNode(left.target, left.index, value)
+                    return self._attach_handle(IndexAssignNode(left.target, left.index, value))
 
                 if isinstance(left, DotAccessNode):
-                    return DotAssignNode(left.target, left.attribute, value)
+                    return self._attach_handle(DotAssignNode(left.target, left.attribute, value))
 
                 raise SyntaxError("Invalid assignment target")
 
             # ✅ rollback if not assignment
             self.pos = save_pos
 
-        return self.expression()
-
+        stmt = self.expression()
+        return self._attach_handle(stmt)
+    
     # --------------------------
     # Assignment
     # --------------------------
@@ -935,49 +936,64 @@ class Parser:
 
     def _parse_handle(self, try_stmt):
         handlers = []
-        else_none_block = None
+        else_block = None
 
-        # first HANDLE
+        # ✅ HANDLE (...)
         self._consume_expected("HANDLE")
 
-        condition = self._parse_handle_condition()
-        block = self._parse_handle_block()
+        condition = None
 
+        if self._match("LPAREN"):
+            self._consume()
+
+            code1 = int(self._consume().value)
+            self._consume_expected("COMMA")
+            code2 = int(self._consume().value)
+
+            self._consume_expected("RPAREN")
+
+            condition = (code1, code2)
+
+        block = self._parse_handle_block()
         handlers.append((condition, block))
 
-        # multiple ELSEHANDLE
+        # ✅ ELSEHANDLE loop
         while self._match("ELSEHANDLE"):
             self._consume()
 
+            # ✅ ANY
             if self._match("ANY"):
                 self._consume()
                 condition = "ANY"
 
+            # ✅ NONE (success case)
             elif self._match("NONE"):
                 self._consume()
-                else_none_block = self._parse_handle_block()
+                else_block = self._parse_handle_block()
                 continue
 
+            # ✅ (code1, code2)
             else:
-                condition = self._parse_handle_condition()
+                self._consume_expected("LPAREN")
+
+                code1 = int(self._consume().value)
+                self._consume_expected("COMMA")
+                code2 = int(self._consume().value)
+
+                self._consume_expected("RPAREN")
+
+                condition = (code1, code2)
 
             block = self._parse_handle_block()
             handlers.append((condition, block))
 
         self._consume_expected("ENDHANDLE")
 
-        return HandleNode([try_stmt], handlers, else_none_block)
-
-    def _parse_handle_condition(self):
-        self._consume_expected("LPAREN")
-
-        code1 = self._consume().value
-        self._consume_expected("COMMA")
-        code2 = self._consume().value
-
-        self._consume_expected("RPAREN")
-
-        return (int(code1), int(code2))
+        return HandleNode(
+            try_block=[try_stmt],
+            handlers=handlers,
+            else_block=else_block
+        )
 
     def _parse_handle_block(self):
         block = []
@@ -985,3 +1001,7 @@ class Parser:
             block.append(self.statement())
         return block
 
+    def _attach_handle(self, stmt):
+        if self._match("HANDLE"):
+            return self._parse_handle(stmt)
+        return stmt
