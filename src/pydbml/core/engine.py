@@ -4,7 +4,7 @@ from pydbml.runtime.environment import Environment
 from pydbml.utils.debug import debug
 from pydbml.runtime.config import RuntimeConfig
 from pydbml.runtime.resolver import ResourceResolver
-
+import os, importlib.util
 
 class Engine:
     """
@@ -17,6 +17,7 @@ class Engine:
         self.config = RuntimeConfig()
         self.resolver = ResourceResolver(self.config)
         self.evaluator = ASTEvaluator(self.env, self.resolver)
+        self._load_plugins()
 
     def execute(self, code: str):
         """
@@ -37,21 +38,22 @@ class Engine:
 
         return result
     
-    def _load_plugins(self):
-        import os, importlib.util
 
+    def _load_plugins(self):
         paths = os.getenv("PYDBML_PLUGIN_PATH", "")
 
         for path in paths.split(os.pathsep):
-            if not path:
+            if not path or not os.path.exists(path):
                 continue
 
             for file in os.listdir(path):
-                if file.endswith(".py"):
+                if file.endswith(".py") and not file.startswith("_"):
                     full_path = os.path.join(path, file)
 
                     spec = importlib.util.spec_from_file_location(file[:-3], full_path)
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
 
+                    # ✅ THIS IS CRITICAL
                     self.evaluator.registry.register_module(module)
+
