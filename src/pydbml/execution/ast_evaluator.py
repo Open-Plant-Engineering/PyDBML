@@ -67,42 +67,32 @@ class ASTEvaluator:
         
             try:
                 result = None
-        
+
                 for stmt in node.try_block:
                     result = self.evaluate(stmt)
-        
+
                 # ✅ success case
                 if node.else_block:
-                    try:
-                        for stmt in node.else_block:
-                            result = self.evaluate(stmt)
-                        return result
-                    except ReturnSignal as r:
-                        return r.value
-        
+                    for stmt in node.else_block:
+                        result = self.evaluate(stmt)
+
                 return result
-        
+
             except PyDBMLError as e:
             
                 for condition, block in node.handlers:
                 
-                    try:
-                        if condition == "ANY":
-                            result = None
+                    if condition == "ANY":
+                        for stmt in block:
+                            self.evaluate(stmt)
+                        return None
+
+                    if isinstance(condition, tuple):
+                        if (e.code1, e.code2) == condition:
                             for stmt in block:
-                                result = self.evaluate(stmt)
-                            return result
-        
-                        if isinstance(condition, tuple):
-                            if (e.code1, e.code2) == condition:
-                                result = None
-                                for stmt in block:
-                                    result = self.evaluate(stmt)
-                                return result
-        
-                    except ReturnSignal as r:
-                        return r.value
-        
+                                self.evaluate(stmt)
+                            return None
+
                 raise
             
         if isinstance(node, ImportNode):

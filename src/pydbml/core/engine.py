@@ -5,6 +5,7 @@ from pydbml.utils.debug import debug
 from pydbml.runtime.config import RuntimeConfig
 from pydbml.runtime.resolver import ResourceResolver
 import os, importlib.util
+from pydbml.execution.return_signal import ReturnSignal
 
 class Engine:
     """
@@ -29,15 +30,17 @@ class Engine:
         ast = parser.parse()
         debug("AST", ast)
 
-        result = None
-        if isinstance(ast, list):
-            for stmt in ast:
-                result = self.evaluator.evaluate(stmt)
-        else:
-            result = self.evaluator.evaluate(ast)
-
-        return result
-    
+        try:
+            result = None
+            if isinstance(ast, list):
+                for stmt in ast:
+                    result = self.evaluator.evaluate(stmt)
+            else:
+                result = self.evaluator.evaluate(ast)
+            return result
+        except ReturnSignal as r:
+            # ✅ FINAL RETURN HANDLER
+            return r.value
 
     def _load_plugins(self):
         paths = os.getenv("PYDBML_PLUGIN_PATH", "")
