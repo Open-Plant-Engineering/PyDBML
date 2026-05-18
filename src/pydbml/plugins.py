@@ -96,6 +96,10 @@ def pydbml_operator(symbol):
 def pydbml_operator(symbol):
     def wrapper(func):
         func._pydbml_operator = True
-        func._pydbml_operator_name = symbol
+        
+        if not hasattr(func, "_pydbml_operator_names"):
+            func._pydbml_operator_names = set()
+
+        func._pydbml_operator_names.add(symbol)
         return func
     return wrapper

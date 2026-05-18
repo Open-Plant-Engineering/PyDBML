@@ -1,10 +1,11 @@
 import re
-from pydbml.types.primitives import Number, String, Boolean
+from pydbml.types.number import Number
+from pydbml.types.string import String
+from pydbml.types.boolean import Boolean
 from pydbml.types.array import Array
 from pydbml.types.object import ObjectInstance
 from pydbml.types.plugin_object import PluginObject
 from pydbml.types.base import PyDBMLType
-from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
 from pydbml.execution.return_signal import ReturnSignal
@@ -50,6 +51,9 @@ class ASTEvaluator:
         self.env = env
         self.resolver = resolver
         self.registry = PluginRegistry()
+        self._method_cache = {}
+        self._operator_cache = {}
+
 
     def evaluate(self, node):
         try:
@@ -562,29 +566,6 @@ class ASTEvaluator:
                 method_name = node.method.lower()
 
                 # --------------------------
-                # ✅ Plugin object method From Python
-                # --------------------------
-                if not isinstance(target, (ObjectInstance, Array, Number, String, Boolean)):
-                    method = None
-                    for attr in dir(target):
-                        if attr.lower() == method_name:
-                            method = getattr(target, attr)
-                            break
-                        
-                    if method:
-                        if not hasattr(method, "_pydbml_method") and not hasattr(method, "_pydbml_operator"):
-                            raise RuntimeError("Method not exposed")
-
-                        py_args = [self._to_python(a) for a in args]
-                        result = method(*py_args)
-
-                        return self._to_pydbml(result)
-
-                    raise Exception(
-                        f"Method '{method_name}' not found on plugin object '{type(target).__name__}'"
-                    )
-
-                # --------------------------
                 # ✅ Case 1: Object method
                 # --------------------------
                 if isinstance(target, ObjectInstance):
@@ -606,11 +587,29 @@ class ASTEvaluator:
                         raise Exception(
                             f"No matching overload for {method_name} with {len(args)} args"
                         )
+                    
+                # --------------------------
+                # ✅ FAST CACHE METHOD LOOKUP (NEW)
+                # --------------------------
+                cls = target.__class__
+                
+                # build cache once
+                self._build_cache(cls)
+                
+                method_map = self._method_cache[cls]
+                method_name_upper = method_name.upper()
+                
+                if method_name_upper in method_map:
+                    # ✅ bind method to instance
+                    method = method_map[method_name_upper].__get__(target, cls)
+                
+                    py_args = [self._to_python(a) for a in args]
+                
+                    result = method(*py_args)
+                
+                    return self._to_pydbml(result)
 
-                # --------------------------
-                # ✅ Case 2: Generic method (PML-style)
-                # --------------------------
-                return MethodRegistry.call(method_name, target, args)
+                raise Exception(f"Method '{method_name}' not found for type '{type(target).__name__}'")
 
             # --------------------------
             # DOT ACCESS
@@ -862,74 +861,25 @@ class ASTEvaluator:
                 debug("BINOP OP", node.op)
 
                 # =====================================================
-                # ✅ PLUGIN OPERATOR SUPPORT (ADD THIS BLOCK)
+                # ✅ FAST OPERATOR LOOKUP (NEW)
                 # =====================================================
-                if not isinstance(left, (Number, String, Boolean)):
-                    cls_name = type(left).__name__.lower()
+                cls = left.__class__
 
-                    key = (cls_name, node.op)
+                self._build_cache(cls)
 
-                    if key in self.registry.operators:
-                        method_name = self.registry.operators[key]
+                operator_map = self._operator_cache[cls]
 
-                        method = getattr(left, method_name)
+                if node.op in operator_map:
+                    # ✅ bind method
+                    method = operator_map[node.op].__get__(left, cls)
+                    py_right = self._to_python(right)
+                    result = method(py_right)
+                    return self._to_pydbml(result)
 
-                        if not hasattr(method, "_pydbml_operator"):
-                            raise RuntimeError("Operator not exposed")
+            raise Exception(
+                f"Operator '{node.op}' not supported for type '{type(left).__name__}'"
+            )
 
-                        # ✅ convert right side
-                        py_right = self._to_python(right)
-
-                        result = method(py_right)
-
-                        return self._to_pydbml(result)
-
-                    raise Exception(f"Operator '{node.op}' not supported for {cls_name}"
-                                    f"Define it using @pydbml_operator('{node.op}')"
-                    )
-
-                # =====================================================
-                # ✅ FALLBACK: existing logic continues below
-                # =====================================================
-
-                if node.op == "+":
-                    return Number(left.value + right.value)
-
-                if node.op == "-":
-                    return Number(left.value - right.value)
-
-                if node.op == "*":
-                    return Number(left.value * right.value)
-
-                if node.op == "/":
-                    return Number(left.value / right.value)
-
-                if node.op == "==":
-                    return Boolean(left.value == right.value)
-
-                if node.op == "!=":
-                    return Boolean(left.value != right.value)
-
-                if node.op == ">":
-                    return Boolean(left.value > right.value)
-
-                if node.op == "<":
-                    return Boolean(left.value < right.value)
-
-                if node.op == ">=":
-                    return Boolean(left.value >= right.value)
-
-                if node.op == "<=":
-                    return Boolean(left.value <= right.value)
-
-                if node.op == "&":
-                    def fmt(v):
-                        if isinstance(v, float) and v.is_integer():
-                            return str(int(v))
-                        return str(v)
-                    return String(fmt(left.value) + fmt(right.value))
-
-            raise Exception(f"Unsupported AST node: {node}")
         except Exception as e:
             # ✅ control flow → never touch
             if isinstance(e, (ReturnSignal, BreakSignal, ContinueSignal, GoLabelSignal)):
@@ -1042,3 +992,30 @@ class ASTEvaluator:
             return PluginObject(value)
 
         return value
+    
+    def _build_cache(self, cls):
+        """
+        Build method + operator cache for a class (only once)
+        """
+
+        if cls in self._method_cache:
+            return
+
+        method_map = {}
+        operator_map = {}
+
+        for attr in dir(cls):
+            member = getattr(cls, attr)
+
+            # ✅ method
+            if callable(member) and hasattr(member, "_pydbml_method"):
+                method_name = member._pydbml_method_name
+                method_map[method_name] = member
+
+            # ✅ operator
+            if callable(member) and hasattr(member, "_pydbml_operator"):
+                for symbol in member._pydbml_operator_names:
+                    operator_map[symbol] = member
+
+        self._method_cache[cls] = method_map
+        self._operator_cache[cls] = operator_map

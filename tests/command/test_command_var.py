@@ -1,5 +1,5 @@
 from pydbml.core.engine import Engine
-
+from pydbml.types.number import Number
 
 def test_command_var_basic():
     engine = Engine()
@@ -16,7 +16,6 @@ def test_command_var_type_preserved():
     engine.execute("!x = 10")
     result = engine.execute("$!x")
 
-    from pydbml.types.primitives import Number
     assert isinstance(result, Number)
 
 

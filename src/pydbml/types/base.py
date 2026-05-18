@@ -15,8 +15,8 @@ class PyDBMLType(ABC):
         """Validate type constraints"""
         pass
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.value})"
+    def __repr__(self):
+        return f"<{self.__class__.__name__.upper()}> {getattr(self, 'value', '')}"
 
     def __str__(self) -> str:
         return str(self.value)

@@ -1,5 +1,7 @@
 import pytest
-from pydbml.types.primitives import String, Number, Boolean
+from pydbml.types.number import Number
+from pydbml.types.string import String
+from pydbml.types.boolean import Boolean
 
 
 def test_string_valid():

@@ -1,6 +1,6 @@
 import pytest
 from pydbml.runtime.environment import Environment
-from pydbml.types.primitives import Number
+from pydbml.types.number import Number
 
 
 def test_set_and_get_variable():

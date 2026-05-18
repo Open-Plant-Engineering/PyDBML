@@ -1,6 +1,6 @@
 import pytest
 from pydbml.runtime.environment import Environment
-from pydbml.types.primitives import String
+from pydbml.types.string import String
 
 
 def test_local_variable_set_get():

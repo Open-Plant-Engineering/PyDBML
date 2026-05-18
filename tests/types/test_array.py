@@ -1,5 +1,6 @@
 from pydbml.types.array import Array
-from pydbml.types.primitives import String, Number
+from pydbml.types.number import Number
+from pydbml.types.string import String
 
 
 def test_array_valid():

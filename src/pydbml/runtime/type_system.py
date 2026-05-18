@@ -1,4 +1,6 @@
-from pydbml.types.primitives import Number, String, Boolean
+from pydbml.types.number import Number
+from pydbml.types.string import String
+from pydbml.types.boolean import Boolean
 from pydbml.types.array import Array
 
 

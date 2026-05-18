@@ -1,46 +1,30 @@
-from pydbml.types.base import PyDBMLType
-from pydbml.utils.debug import debug
+from pydbml.plugins import pydbml_class, pydbml_method
+from .base import PyDBMLType
 
+@pydbml_class
 class Array(PyDBMLType):
+
     def __init__(self):
-        super().__init__({})  # use dict for sparse array
+        self.value = {}
 
     def validate(self):
         if not isinstance(self.value, dict):
-            raise TypeError("Array must be dict-based")
+            raise TypeError("Invalid array")
+    
+    @pydbml_method("GET")
+    def get(self, index):
+        return self.value[int(index)]
 
-    def set(self, index: int, item: PyDBMLType):
-        if not isinstance(index, int):
-            raise TypeError("Array index must be integer")
+    @pydbml_method("SET")
+    def set(self, index, value):
+        self.value[int(index)] = value
+        return value
 
-        if index < 1:
-            raise ValueError("Array index starts from 1")
-
-        if not isinstance(item, PyDBMLType):
-            # ✅ allow plugin objects
-            if not hasattr(item, "__class__"):
-                raise TypeError("Array value must be valid type")
-        
-        debug("ARRAY SET", f"index={index}, value={item}")
-        debug("ARRAY STATE", self.value)
-
-        self.value[index] = item
-
-    def get(self, index: int):
-        if index not in self.value:
-            raise KeyError(f"Index {index} not set")
-        debug("ARRAY GET", f"index={index}, value={self.value.get(index)}")
-        return self.value.get(index)
-
-
+    @pydbml_method("LENGTH")
+    def length(self):
+        return len(self.value)
+    
     def __str__(self):
         if not self.value:
             return "<ARRAY>"
-
-        lines = ["<ARRAY>"]
-
-        for idx in sorted(self.value.keys()):
-            item = self.value[idx]
-            lines.append(f"   [{idx}] {item}")
-
-        return "\n".join(lines)
+        return f"<ARRAY> {self.value}"
