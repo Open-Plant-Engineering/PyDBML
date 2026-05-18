@@ -267,38 +267,45 @@ class ASTEvaluator:
             return value
         
         if isinstance(node, ObjectNode):
-
+        
             # ✅ PLUGIN HOOK
             type_name = node.type_name.lower()
 
+            # --------------------------
+            # ✅ 1. Plugin classes
+            # --------------------------
             if type_name in self.registry.classes:
                 py_class = self.registry.classes[type_name]
                 args = [self._to_python(self.evaluate(arg)) for arg in node.args]
                 instance = py_class(*args)
                 return instance
 
-            if node.type_name == "array":
+            # --------------------------
+            # ✅ 2. Built-in array
+            # --------------------------
+            if type_name == "array":
                 return Array()
 
-            if node.type_name.lower() != "object":
-            
-                loader = ObjectLoader(self.resolver)
-                obj_def = loader.load(node.type_name.lower())
+            # --------------------------
+            # ✅ 3. NEW: In-memory object definitions ✅
+            # --------------------------
+            if hasattr(self, "object_defs") and type_name in self.object_defs:
+                obj_def = self.object_defs[type_name]
 
                 instance = ObjectInstance(obj_def)
 
-                constructor_name = node.type_name.lower()
-
-                # ✅ evaluate arguments
+                constructor_name = type_name
                 args = [self.evaluate(arg) for arg in node.args]
 
                 if constructor_name in obj_def.methods:
                 
                     methods = obj_def.methods[constructor_name]
-                    
-                    # ✅ methods is a list
+
+                    if not isinstance(methods, list):
+                        methods = [methods]
+
                     selected = None
-                    
+
                     for m in methods:
                         if len(m.params) == len(args):
                             selected = m
@@ -308,14 +315,51 @@ class ASTEvaluator:
                         raise Exception(
                             f"No matching constructor '{constructor_name}' for {len(args)} arguments"
                         )
-                    
+
                     self._execute_method(instance, selected, args)
-                else:
-                    # ✅ if constructor not present but args given → error
-                    if len(args) > 0:
+
+                elif len(args) > 0:
+                    raise Exception(
+                        f"No constructor defined for '{node.type_name}' but arguments provided"
+                    )
+
+                return instance
+
+            # --------------------------
+            # ✅ 4. Existing file loader (unchanged)
+            # --------------------------
+            if type_name != "object":
+            
+                loader = ObjectLoader(self.resolver)
+                obj_def = loader.load(type_name)
+
+                instance = ObjectInstance(obj_def)
+
+                constructor_name = type_name
+                args = [self.evaluate(arg) for arg in node.args]
+
+                if constructor_name in obj_def.methods:
+                
+                    methods = obj_def.methods[constructor_name]
+
+                    selected = None
+
+                    for m in methods:
+                        if len(m.params) == len(args):
+                            selected = m
+                            break
+                        
+                    if selected is None:
                         raise Exception(
-                            f"No constructor defined for '{node.type_name}' but arguments provided"
+                            f"No matching constructor '{constructor_name}' for {len(args)} arguments"
                         )
+
+                    self._execute_method(instance, selected, args)
+
+                elif len(args) > 0:
+                    raise Exception(
+                        f"No constructor defined for '{node.type_name}' but arguments provided"
+                    )
 
                 return instance
 
@@ -328,25 +372,43 @@ class ASTEvaluator:
         # Object Definition
         # --------------------------
         if isinstance(node, ObjectDefNode):
-            # ✅ definition only, no runtime execution
+            name = node.name.lower()
+            # ✅ store object definition
+            if not hasattr(self, "object_defs"):
+                self.object_defs = {}
+            self.object_defs[name] = node
             return None
 
         # --------------------------
         # Method Definition
         # --------------------------
         if isinstance(node, MethodDefNode):
-            # ✅ definition only, no runtime execution
+        
+            # ✅ ensure object storage exists
+            if not hasattr(self, "object_defs"):
+                self.object_defs = {}
+        
+            method_name = node.name.lower()
+        
+            # ✅ attach to ALL objects that match method name (simple rule)
+            for obj_name, obj_def in self.object_defs.items():
+            
+                # ✅ initialize method dict if missing
+                if not hasattr(obj_def, "methods") or obj_def.methods is None:
+                    obj_def.methods = {}
+        
+                if method_name not in obj_def.methods:
+                    obj_def.methods[method_name] = []
+        
+                obj_def.methods[method_name].append(node)
+        
             return None
         
         if isinstance(node, FunctionDefNode):
-            # return last return value found
-            try:
-                result = None
-                for stmt in node.body:
-                    result = self.evaluate(stmt)
-                return result
-            except ReturnSignal as r:
-                return r.value
+            name = node.name.lower()
+            # ✅ store function definition
+            self.registry.functions[name] = node
+            return None
             
         if isinstance(node, FunctionCallNode):
 
@@ -355,10 +417,44 @@ class ASTEvaluator:
             if name in self.registry.functions:
                 func = self.registry.functions[name]
 
-                py_args = [self._to_python(self.evaluate(a)) for a in node.args]
-                result = func(*py_args)
-                converted = self._to_pydbml(result)
-                return converted
+                # --------------------------
+                # ✅ CASE 1: Python plugin function
+                # --------------------------
+                if callable(func):
+                    py_args = [self._to_python(self.evaluate(a)) for a in node.args]
+                    result = func(*py_args)
+                    return self._to_pydbml(result)
+
+                # --------------------------
+                # ✅ CASE 2: DSL function (FunctionDefNode)
+                # --------------------------
+                if isinstance(func, FunctionDefNode):
+                    func_ast = func
+                    # evaluate arguments
+                    arg_values = [self.evaluate(arg) for arg in node.args]
+                    if len(arg_values) != len(func_ast.params):
+                        raise Exception(
+                            f"{name} expects {len(func_ast.params)} args, got {len(arg_values)}"
+                        )
+
+                    self.env.push_scope()
+                    try:
+                        # bind parameters
+                        for (param_name, param_type), value in zip(func_ast.params, arg_values):
+                            self.env.set(param_name, value, is_global=False)
+
+                        result = None
+
+                        for stmt in func_ast.body:
+                            result = self.evaluate(stmt)
+
+                        return result
+
+                    except ReturnSignal as r:
+                        return r.value
+
+                    finally:
+                        self.env.pop_scope()
 
             loader = FunctionLoader(self.resolver)
             func_ast = loader.load(node.name)
