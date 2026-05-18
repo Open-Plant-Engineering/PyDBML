@@ -33,6 +33,7 @@ from pydbml.ast.nodes import (
     ObjectDefNode,
     MethodDefNode,
     ImportNode,
+    HandleNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.lexer.tokenizer import tokenize
@@ -41,6 +42,11 @@ import importlib
 import importlib.util
 from pydbml.runtime.plugin_registry import PluginRegistry
 
+class PyDBMLError(Exception):
+    def __init__(self, code1, code2, message=""):
+        self.code1 = code1
+        self.code2 = code2
+        self.message = message
 
 class ASTEvaluator:
     def __init__(self, env, resolver=None):
@@ -53,7 +59,52 @@ class ASTEvaluator:
             return None
 
         debug("NODE START", node)
+
+        if callable(node):
+            return node()
+
+        if isinstance(node, HandleNode):
         
+            try:
+                result = None
+        
+                for stmt in node.try_block:
+                    result = self.evaluate(stmt)
+        
+                # ✅ success case
+                if node.else_block:
+                    try:
+                        for stmt in node.else_block:
+                            result = self.evaluate(stmt)
+                        return result
+                    except ReturnSignal as r:
+                        return r.value
+        
+                return result
+        
+            except PyDBMLError as e:
+            
+                for condition, block in node.handlers:
+                
+                    try:
+                        if condition == "ANY":
+                            result = None
+                            for stmt in block:
+                                result = self.evaluate(stmt)
+                            return result
+        
+                        if isinstance(condition, tuple):
+                            if (e.code1, e.code2) == condition:
+                                result = None
+                                for stmt in block:
+                                    result = self.evaluate(stmt)
+                                return result
+        
+                    except ReturnSignal as r:
+                        return r.value
+        
+                raise
+            
         if isinstance(node, ImportNode):
             return self.eval_import(node)
 

@@ -24,6 +24,7 @@ from pydbml.ast.nodes import (
     ObjectNode,
     SkipIfNode,
     ImportNode,
+    HandleNode,
 )
 from pydbml.utils.debug import debug
 
@@ -46,7 +47,6 @@ class Parser:
     # --------------------------
     def statement(self):
         token = self._peek()
-        next_token = self._peek_next()
 
         # --------------------------
         # ✅ IMPORT handling
@@ -932,3 +932,56 @@ class Parser:
             step=step,
             body=body
         )
+
+    def _parse_handle(self, try_stmt):
+        handlers = []
+        else_none_block = None
+
+        # first HANDLE
+        self._consume_expected("HANDLE")
+
+        condition = self._parse_handle_condition()
+        block = self._parse_handle_block()
+
+        handlers.append((condition, block))
+
+        # multiple ELSEHANDLE
+        while self._match("ELSEHANDLE"):
+            self._consume()
+
+            if self._match("ANY"):
+                self._consume()
+                condition = "ANY"
+
+            elif self._match("NONE"):
+                self._consume()
+                else_none_block = self._parse_handle_block()
+                continue
+
+            else:
+                condition = self._parse_handle_condition()
+
+            block = self._parse_handle_block()
+            handlers.append((condition, block))
+
+        self._consume_expected("ENDHANDLE")
+
+        return HandleNode([try_stmt], handlers, else_none_block)
+
+    def _parse_handle_condition(self):
+        self._consume_expected("LPAREN")
+
+        code1 = self._consume().value
+        self._consume_expected("COMMA")
+        code2 = self._consume().value
+
+        self._consume_expected("RPAREN")
+
+        return (int(code1), int(code2))
+
+    def _parse_handle_block(self):
+        block = []
+        while not self._match("ELSEHANDLE") and not self._match("ENDHANDLE"):
+            block.append(self.statement())
+        return block
+

@@ -179,3 +179,13 @@ class ImportNode:
     def __init__(self, path):
         self.path = path
 
+class HandleNode(ASTNode):
+    def __init__(self, try_block, handlers=None, else_block=None):
+        self.try_block = try_block              # list of statements
+        self.handlers = handlers or []          # list of (condition, block)
+        self.else_block = else_block            # success case
+
+class HandleCase:
+    def __init__(self, condition, block):
+        self.condition = condition  # tuple OR 'ANY'
+        self.block = block
