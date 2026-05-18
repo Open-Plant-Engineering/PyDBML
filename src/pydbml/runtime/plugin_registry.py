@@ -17,7 +17,7 @@ class PluginRegistry:
                 for attr in dir(obj):
                     method = getattr(obj, attr)
                     if hasattr(method, "_pydbml_operator"):
-                        op = method._pydbml_operator
+                        op = method._pydbml_operator_name
                         self.operators[(name.lower(), op)] = attr
 
             # ✅ function
