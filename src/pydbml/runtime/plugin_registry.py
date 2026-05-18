@@ -11,7 +11,8 @@ class PluginRegistry:
             obj = getattr(module, name)
 
             if hasattr(obj, "_pydbml_class"):
-                self.classes[name.lower()] = obj
+                for cls_name in obj._pydbml_class_names:
+                    self.classes[cls_name] = obj
 
                 # ✅ scan class methods for operators
                 for attr in dir(obj):

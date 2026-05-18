@@ -1,5 +1,5 @@
 import re
-from pydbml.types.number import Number
+from pydbml.types.real import Real
 from pydbml.types.string import String
 from pydbml.types.boolean import Boolean
 from pydbml.types.array import Array
@@ -143,7 +143,7 @@ class ASTEvaluator:
                         print(f"[INDICES] {node.var} = {key}")
 
                         # ✅ loop variable = actual index
-                        self.env.set(node.var, Number(key), False)
+                        self.env.set(node.var, Real(key), False)
 
                         try:
                             for stmt in node.body:
@@ -203,7 +203,7 @@ class ASTEvaluator:
                         
                         print(f"[RANGE] {node.var} = {i}")
 
-                        self.env.set(node.var, Number(i), False)
+                        self.env.set(node.var, Real(i), False)
 
                         try:
                             for stmt in node.body:
@@ -811,7 +811,7 @@ class ASTEvaluator:
             # Number
             # --------------------------
             if node.__class__.__name__ == "NumberNode":
-                return Number(node.value)
+                return Real(node.value)
 
             # --------------------------
             # String
@@ -836,7 +836,7 @@ class ASTEvaluator:
                         value = self.env.get(node.name).get()
                 except KeyError:
                     # ✅ auto initialize numeric variable
-                    value = Number(0)
+                    value = Real(0)
                     self.env.set(node.name, value, node.is_global)
 
                 debug("VARIABLE RESOLVE", f"{node.name} → {value}")
@@ -876,9 +876,9 @@ class ASTEvaluator:
                     result = method(py_right)
                     return self._to_pydbml(result)
 
-            raise Exception(
-                f"Operator '{node.op}' not supported for type '{type(left).__name__}'"
-            )
+                raise Exception(
+                    f"Operator '{node.op}' not supported for type '{type(left).__name__}'"
+                )
 
         except Exception as e:
             # ✅ control flow → never touch
@@ -943,7 +943,7 @@ class ASTEvaluator:
     def _to_python(self, value):
         if isinstance(value, PluginObject):
             return value.obj
-        if isinstance(value, Number):
+        if isinstance(value, Real):
             return value.value
         if isinstance(value, String):
             return value.value
@@ -964,7 +964,7 @@ class ASTEvaluator:
         if isinstance(value, bool):
             return Boolean(value)
         if isinstance(value, (int, float)):
-            return Number(float(value))
+            return Real(float(value))
         if isinstance(value, str):
             return String(value)
         # ✅ dict FIRST (important)
@@ -1009,8 +1009,8 @@ class ASTEvaluator:
 
             # ✅ method
             if callable(member) and hasattr(member, "_pydbml_method"):
-                method_name = member._pydbml_method_name
-                method_map[method_name] = member
+                for name in member._pydbml_method_names:
+                    method_map[name] = member
 
             # ✅ operator
             if callable(member) and hasattr(member, "_pydbml_operator"):

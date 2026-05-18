@@ -1,5 +1,5 @@
 import pytest
-from pydbml.types.number import Number
+from pydbml.types.real import Real
 from pydbml.types.string import String
 from pydbml.types.boolean import Boolean
 
@@ -15,13 +15,13 @@ def test_string_invalid():
 
 
 def test_number_valid():
-    Number(10).validate()
-    Number(3.14).validate()
+    Real(10).validate()
+    Real(3.14).validate()
 
 
 def test_number_invalid():
     with pytest.raises(TypeError):
-        Number("abc").validate()
+        Real("abc").validate()
 
 
 def test_boolean_valid():

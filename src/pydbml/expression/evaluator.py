@@ -1,4 +1,4 @@
-from pydbml.types.number import Number
+from pydbml.types.real import Real
 from pydbml.types.string import String
 from pydbml.types.boolean import Boolean
 
@@ -85,15 +85,15 @@ class ExpressionEvaluator:
     def _apply_operator(self, left, right, op):
 
         # Number operations
-        if isinstance(left, Number) and isinstance(right, Number):
+        if isinstance(left, Real) and isinstance(right, Real):
             if op == "+":
-                return Number(left.value + right.value)
+                return Real(left.value + right.value)
             elif op == "-":
-                return Number(left.value - right.value)
+                return Real(left.value - right.value)
             elif op == "*":
-                return Number(left.value * right.value)
+                return Real(left.value * right.value)
             elif op == "/":
-                return Number(left.value / right.value)
+                return Real(left.value / right.value)
 
         # String concat
         if isinstance(left, String) and isinstance(right, String):

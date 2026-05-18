@@ -15,7 +15,11 @@ class String(PyDBMLType):
         if not isinstance(self.value, str):
             raise TypeError("Invalid string")
         
-    @pydbml_operator("&")
-    @pydbml_operator("+")
+    @pydbml_operator("+", "&")
     def concat(self, other):
-        return self.value + str(other)
+        def fmt(v):
+            if isinstance(v, float) and v.is_integer():
+                return str(int(v))
+            return str(v)
+
+        return self.value + fmt(other)

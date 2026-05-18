@@ -1,4 +1,4 @@
-from pydbml.types.number import Number
+from pydbml.types.real import Real
 from pydbml.types.string import String
 from pydbml.types.boolean import Boolean
 from pydbml.types.array import Array
@@ -26,7 +26,7 @@ class Resolver:
             return String("")
 
         if raw_lower == "object real()":
-            return Number(0)
+            return Real(0)
 
         if raw_lower == "object boolean()":
             return Boolean(False)
@@ -47,10 +47,10 @@ class Resolver:
         # Number
         # --------------------------
         try:
-            return Number(int(raw))
+            return Real(int(raw))
         except ValueError:
             try:
-                return Number(float(raw))
+                return Real(float(raw))
             except ValueError:
                 pass
 

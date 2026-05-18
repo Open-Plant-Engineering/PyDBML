@@ -1,5 +1,5 @@
 from pydbml.types.array import Array
-from pydbml.types.number import Number
+from pydbml.types.real import Real
 from pydbml.types.string import String
 
 
@@ -7,7 +7,7 @@ def test_array_valid():
     arr = Array()
 
     arr.set(1, String("a"))
-    arr.set(2, Number(1))
+    arr.set(2, Real(1))
 
     assert arr.get(1).value == "a"
     assert arr.get(2).value == 1

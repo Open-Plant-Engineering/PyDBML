@@ -1,12 +1,12 @@
 import pytest
 from pydbml.runtime.environment import Environment
-from pydbml.types.number import Number
+from pydbml.types.real import Real
 
 
 def test_set_and_get_variable():
     env = Environment()
 
-    env.set("x", Number(10))
+    env.set("x", Real(10))
     value = env.get("x")
 
     assert value.get().value == 10

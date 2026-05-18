@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any
-
+from pydbml.plugins import pydbml_member, pydbml_method, pydbml_operator
 
 class PyDBMLType(ABC):
     """
@@ -24,3 +24,7 @@ class PyDBMLType(ABC):
     def to_python(self) -> Any:
         """Convert to native Python type"""
         return self.value
+
+    @pydbml_method("OBJECTTYPE")
+    def objecttype(self):
+        return self.__repr__()

@@ -1,105 +1,130 @@
 # pydbml/plugins.py
 
 
-def pydbml_class(name=None):
+def pydbml_class(*names):
     """
     Supports:
     @pydbml_class
-    @pydbml_class("custom")
+    @pydbml_class("custom","Custom2")
     """
-    if callable(name):
-        cls = name
-        cls._pydbml_class = True
-        cls._pydbml_class_name = cls.__name__.lower()
-        return cls
-
     def wrapper(cls):
         cls._pydbml_class = True
-        cls._pydbml_class_name = (name or cls.__name__).lower()
+
+        if not hasattr(cls, "_pydbml_class_names"):
+            cls._pydbml_class_names = set()
+
+        if not names:
+            cls._pydbml_class_names.add(cls.__name__.lower())
+        else:
+            for name in names:
+                cls._pydbml_class_names.add(name.lower())
+
         return cls
+
+    # ✅ support @pydbml_class without ()
+    if len(names) == 1 and callable(names[0]):
+        cls = names[0]
+        names = ()
+        return wrapper(cls)
 
     return wrapper
 
 
-def pydbml_method(name=None):
+def pydbml_method(*names):
     """
     Supports:
     @pydbml_method
     @pydbml_method("EQ")
     """
-    if callable(name):
-        func = name
-        func._pydbml_method = True
-        func._pydbml_method_name = func.__name__.upper()
-        return func
-
     def wrapper(func):
         func._pydbml_method = True
-        func._pydbml_method_name = (name or func.__name__).upper()
+
+        if not hasattr(func, "_pydbml_method_names"):
+            func._pydbml_method_names = set()
+
+        if not names:
+            func._pydbml_method_names.add(func.__name__.upper())
+        else:
+            for name in names:
+                func._pydbml_method_names.add(name.upper())
         return func
+
+    if len(names) == 1 and callable(names[0]):
+        func = names[0]
+        names = ()
+        return wrapper(func)
 
     return wrapper
 
 
-def pydbml_member(name=None):
+def pydbml_member(*names):
     """
     Supports:
     @pydbml_member
     @pydbml_member("attr")
     """
-    if callable(name):
-        func = name
-        func._pydbml_member = True
-        func._pydbml_member_name = func.__name__.lower()
-        return func
-
     def wrapper(func):
         func._pydbml_member = True
-        func._pydbml_member_name = (name or func.__name__).lower()
+
+        if not hasattr(func, "_pydbml_member_names"):
+            func._pydbml_member_names = set()
+
+        if not names:
+            func._pydbml_member_names.add(func.__name__.lower())
+        else:
+            for name in names:
+                func._pydbml_member_names.add(name.lower())
+
         return func
+
+    if len(names) == 1 and callable(names[0]):
+        func = names[0]
+        names = ()
+        return wrapper(func)
 
     return wrapper
 
 
-def pydbml_function(name=None):
+def pydbml_function(*names):
     """
     Supports:
     @pydbml_function
     @pydbml_function("myfunc")
     """
-    if callable(name):
-        func = name
-        func._pydbml_function = True
-        func._pydbml_function_name = func.__name__.lower()
-        return func
-
     def wrapper(func):
         func._pydbml_function = True
-        func._pydbml_function_name = (name or func.__name__).lower()
+
+        if not hasattr(func, "_pydbml_function_names"):
+            func._pydbml_function_names = set()
+
+        if not names:
+            func._pydbml_function_names.add(func.__name__.lower())
+        else:
+            for name in names:
+                func._pydbml_function_names.add(name.lower())
+
         return func
+
+    if len(names) == 1 and callable(names[0]):
+        func = names[0]
+        names = ()
+        return wrapper(func)
 
     return wrapper
 
 
-def pydbml_operator(symbol):
+def pydbml_operator(*symbols):
     """
     Always requires symbol:
-    @pydbml_operator("+")
+    @pydbml_operator("+","&")
     """
-    def wrapper(func):
-        func._pydbml_operator = symbol
-        return func
-
-    return wrapper
-
-
-def pydbml_operator(symbol):
     def wrapper(func):
         func._pydbml_operator = True
         
         if not hasattr(func, "_pydbml_operator_names"):
             func._pydbml_operator_names = set()
 
-        func._pydbml_operator_names.add(symbol)
+        for symbol in symbols:
+            func._pydbml_operator_names.add(symbol)
         return func
     return wrapper

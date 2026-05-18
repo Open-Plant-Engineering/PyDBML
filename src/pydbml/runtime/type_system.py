@@ -1,11 +1,11 @@
-from pydbml.types.number import Number
+from pydbml.types.real import Real
 from pydbml.types.string import String
 from pydbml.types.boolean import Boolean
 from pydbml.types.array import Array
 
 
 TYPE_MAP = {
-    "REAL": Number,
+    "REAL": Real,
     "STRING": String,
     "BOOLEAN": Boolean,
     "ARRAY": Array,

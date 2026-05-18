@@ -2,13 +2,13 @@ from pydbml.plugins import pydbml_class, pydbml_method, pydbml_operator
 from .base import PyDBMLType
 
 @pydbml_class
-class Number(PyDBMLType):
+class Real(PyDBMLType):
 
     def __init__(self, value):
         self.value = value
 
     @pydbml_operator("+")
-    @pydbml_method("ADD")
+    @pydbml_method("ADD", "PLUS", "SUM")
     def add(self, other):
         return self.value + other
 
