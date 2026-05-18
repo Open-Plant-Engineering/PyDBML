@@ -178,3 +178,4 @@ class SkipIfNode:
 class ImportNode:
     def __init__(self, path):
         self.path = path
+
