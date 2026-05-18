@@ -36,4 +36,22 @@ class Engine:
             result = self.evaluator.evaluate(ast)
 
         return result
-        
+    
+    def _load_plugins(self):
+        import os, importlib.util
+
+        paths = os.getenv("PYDBML_PLUGIN_PATH", "")
+
+        for path in paths.split(os.pathsep):
+            if not path:
+                continue
+
+            for file in os.listdir(path):
+                if file.endswith(".py"):
+                    full_path = os.path.join(path, file)
+
+                    spec = importlib.util.spec_from_file_location(file[:-3], full_path)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+
+                    self.evaluator.registry.register_module(module)
