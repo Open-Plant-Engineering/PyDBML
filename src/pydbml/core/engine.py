@@ -5,8 +5,7 @@ from pydbml.utils.debug import debug
 from pydbml.runtime.config import RuntimeConfig
 from pydbml.runtime.resolver import ResourceResolver
 import os, importlib.util
-from pydbml.execution.return_signal import ReturnSignal
-from pydbml.execution.signals import GoLabelSignal
+from pydbml.execution.signals import GoLabelSignal, ReturnSignal
 from pydbml.ast.nodes import LabelNode, DoNode, IfNode, HandleNode
 
 

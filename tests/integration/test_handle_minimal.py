@@ -2,7 +2,7 @@ from pydbml.core.engine import Engine
 from pydbml.execution.ast_evaluator import PyDBMLError
 from pydbml.execution.ast_evaluator import ASTEvaluator
 from pydbml.ast.nodes import HandleNode, ReturnNode, NumberNode
-from pydbml.execution.return_signal import ReturnSignal
+from pydbml.execution.signals import ReturnSignal
 
 
 def test_handle_basic_manual():

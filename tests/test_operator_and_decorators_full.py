@@ -257,7 +257,7 @@ def test_invalid_operator():
     e.execute("!x = 10")
 
     with pytest.raises(Exception):
-        e.execute("!y = !x ^ 2")   # not defined
+        e.execute("!y = !x === 2")   # not defined
 
 
 # =========================================================

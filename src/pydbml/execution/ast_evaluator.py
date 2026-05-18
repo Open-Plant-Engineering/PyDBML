@@ -8,8 +8,7 @@ from pydbml.types.plugin_object import PluginObject
 from pydbml.types.base import PyDBMLType
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
-from pydbml.execution.return_signal import ReturnSignal
-from pydbml.execution.signals import BreakSignal, ContinueSignal, GoLabelSignal
+from pydbml.execution.signals import BreakSignal, ContinueSignal, GoLabelSignal, ReturnSignal
 from pydbml.runtime.object_loader import ObjectLoader
 from pydbml.runtime.variable import Variable
 from pydbml.ast.nodes import (
