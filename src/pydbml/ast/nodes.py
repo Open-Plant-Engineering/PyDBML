@@ -189,3 +189,11 @@ class HandleCase:
     def __init__(self, condition, block):
         self.condition = condition  # tuple OR 'ANY'
         self.block = block
+
+class LabelNode:
+    def __init__(self, name):
+        self.name = name
+
+class GoLabelNode:
+    def __init__(self, name):
+        self.name = name

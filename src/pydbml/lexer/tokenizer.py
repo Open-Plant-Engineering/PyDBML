@@ -38,6 +38,9 @@ TOKEN_SPEC = [
     ("NONE", r"\bnone\b"),
     ("ENDHANDLE", r"\bendhandle\b"),
 
+    ("LABEL", r"\blabel\b"),
+    ("GOLABEL", r"\bgolabel\b"),
+    
     ("AND", r"\band\b"),
     ("OR", r"\bor\b"),
     ("NOT", r"\bnot\b"),

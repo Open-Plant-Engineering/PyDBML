@@ -8,7 +8,7 @@ from pydbml.runtime.methods import MethodRegistry
 from pydbml.runtime.function_loader import FunctionLoader
 from pydbml.runtime.type_system import check_type
 from pydbml.execution.return_signal import ReturnSignal
-from pydbml.execution.signals import BreakSignal, ContinueSignal
+from pydbml.execution.signals import BreakSignal, ContinueSignal, GoLabelSignal
 from pydbml.runtime.object_loader import ObjectLoader
 from pydbml.runtime.variable import Variable
 from pydbml.ast.nodes import (
@@ -34,6 +34,8 @@ from pydbml.ast.nodes import (
     MethodDefNode,
     ImportNode,
     HandleNode,
+    GoLabelNode,
+    LabelNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.lexer.tokenizer import tokenize
@@ -53,7 +55,11 @@ class ASTEvaluator:
         try:
             if node is None:
                 return None
-
+            if isinstance(node, GoLabelNode):
+                raise GoLabelSignal(node.name)
+            if isinstance(node, LabelNode):
+                return None
+    
             debug("NODE START", node)
 
             if callable(node):
@@ -926,7 +932,7 @@ class ASTEvaluator:
             raise Exception(f"Unsupported AST node: {node}")
         except Exception as e:
             # ✅ control flow → never touch
-            if isinstance(e, (ReturnSignal, BreakSignal, ContinueSignal)):
+            if isinstance(e, (ReturnSignal, BreakSignal, ContinueSignal, GoLabelSignal)):
                 raise
             
             # ✅ DSL error → keep

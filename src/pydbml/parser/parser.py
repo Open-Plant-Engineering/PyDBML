@@ -25,6 +25,8 @@ from pydbml.ast.nodes import (
     SkipIfNode,
     ImportNode,
     HandleNode,
+    GoLabelNode,
+    LabelNode,
 )
 from pydbml.utils.debug import debug
 
@@ -47,6 +49,39 @@ class Parser:
     # --------------------------
     def statement(self):
         token = self._peek()
+
+        if self._match("LABEL"):
+            self._consume()
+
+            # expect '/'
+            if not self._match("DIV"):
+                raise SyntaxError("Expected '/' before label name")
+
+            self._consume()  # consume '/'
+
+            name_token = self._consume()
+            if name_token.type != "IDENTIFIER":
+                raise SyntaxError(f"Invalid label name '{name_token.value}' (keyword not allowed)")
+
+            name = "/" + name_token.value.lower()
+
+            return LabelNode(name)
+
+        if self._match("GOLABEL"):
+            self._consume()
+
+            if not self._match("DIV"):
+                raise SyntaxError("Expected '/' before label name")
+
+            self._consume()
+
+            name_token = self._consume()
+            if name_token.type != "IDENTIFIER":
+                raise SyntaxError(f"Invalid label name '{name_token.value}' (keyword not allowed)")
+
+            name = "/" + name_token.value.lower()
+
+            return GoLabelNode(name)
 
         # --------------------------
         # ✅ IMPORT handling

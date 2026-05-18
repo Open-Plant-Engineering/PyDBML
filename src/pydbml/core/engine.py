@@ -6,6 +6,9 @@ from pydbml.runtime.config import RuntimeConfig
 from pydbml.runtime.resolver import ResourceResolver
 import os, importlib.util
 from pydbml.execution.return_signal import ReturnSignal
+from pydbml.execution.signals import GoLabelSignal
+from pydbml.ast.nodes import LabelNode, DoNode, IfNode, HandleNode
+
 
 class Engine:
     """
@@ -30,16 +33,43 @@ class Engine:
         ast = parser.parse()
         debug("AST", ast)
 
+        label_map = self._collect_labels(ast)
+
+        i = 0
+        depth = 0
+        result = None
+
         try:
-            result = None
-            if isinstance(ast, list):
-                for stmt in ast:
+        
+            if not isinstance(ast, list):
+                ast = [ast]
+
+            while i < len(ast):
+                stmt = ast[i]
+
+                try:
                     result = self.evaluator.evaluate(stmt)
-            else:
-                result = self.evaluator.evaluate(ast)
+                    i += 1
+
+                except GoLabelSignal as g:
+                
+                    if g.label not in label_map:
+                        raise Exception(f"Label '{g.label}' not found")
+
+                    target = label_map[g.label]
+
+                    # ✅ depth validation (VERY IMPORTANT)
+                    if target["depth"] > depth:
+                        raise Exception(f"Invalid jump into inner block: {g.label}")
+
+                    # ✅ perform jump
+                    ast = target["nodes"]
+                    i = target["index"] + 1
+                    depth = target["depth"]
+
             return result
+
         except ReturnSignal as r:
-            # ✅ FINAL RETURN HANDLER
             return r.value
 
     def _load_plugins(self):
@@ -60,3 +90,36 @@ class Engine:
                     # ✅ THIS IS CRITICAL
                     self.evaluator.registry.register_module(module)
 
+    def _collect_labels(self, nodes, depth=0, label_map=None):
+        if label_map is None:
+            label_map = {}
+
+        for idx, stmt in enumerate(nodes):
+
+            if isinstance(stmt, LabelNode):
+                if stmt.name in label_map:
+                    raise Exception(f"Duplicate label '{stmt.name}'")
+
+                label_map[stmt.name] = {
+                    "nodes": nodes,
+                    "index": idx,
+                    "depth": depth
+                }
+
+            # traverse nested
+            if hasattr(stmt, "body") and isinstance(stmt.body, list):
+                self._collect_labels(stmt.body, depth + 1, label_map)
+
+            if isinstance(stmt, IfNode):
+                if isinstance(stmt.then_branch, list):
+                    self._collect_labels(stmt.then_branch, depth + 1, label_map)
+                if isinstance(stmt.else_branch, list):
+                    self._collect_labels(stmt.else_branch, depth + 1, label_map)
+
+            if isinstance(stmt, HandleNode):
+                for _, block in stmt.handlers:
+                    self._collect_labels(block, depth + 1, label_map)
+                if stmt.else_block:
+                    self._collect_labels(stmt.else_block, depth + 1, label_map)
+
+        return label_map
