@@ -36,6 +36,9 @@ from pydbml.ast.nodes import (
     HandleNode,
     GoLabelNode,
     LabelNode,
+    BinaryOpNode,
+    NumberNode,
+    VariableNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.utils.debug import debug
@@ -883,7 +886,7 @@ class ASTEvaluator:
             # --------------------------
             # Number
             # --------------------------
-            if node.__class__.__name__ == "NumberNode":
+            if isinstance(node, NumberNode):
                 return Real(node.value)
 
             # --------------------------
@@ -901,7 +904,7 @@ class ASTEvaluator:
             # --------------------------
             # Variable
             # --------------------------
-            if node.__class__.__name__ == "VariableNode":
+            if isinstance(node, VariableNode):
                 try:
                     if node.is_global:
                         value = self.env.get_global(node.name).get()
@@ -918,7 +921,7 @@ class ASTEvaluator:
             # --------------------------
             # Binary Operation
             # --------------------------
-            if node.__class__.__name__ == "BinaryOpNode":
+            if isinstance(node, BinaryOpNode):
                 left = self.evaluate(node.left)
                 right = self.evaluate(node.right)
 
