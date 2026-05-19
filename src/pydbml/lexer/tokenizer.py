@@ -133,7 +133,7 @@ BUILTIN_OPERATORS = {
 
 def tokenize(code: str):
     tokens = []
-    
+
     regex = build_token_regex()
 
     for match in re.finditer(regex, code, flags=re.IGNORECASE):
@@ -143,6 +143,17 @@ def tokenize(code: str):
         if kind in ("COMMENT_LINE", "COMMENT_BLOCK"):
             continue
 
+        # ✅ line & column tracking
+        start = match.start()
+
+        line = code.count("\n", 0, start) + 1
+        last_newline = code.rfind("\n", 0, start)
+
+        if last_newline < 0:
+            last_newline = -1
+
+        column = start - last_newline
+
         # ✅ normalize keywords
         if kind in {"IF", "THEN", "ELSE", "AND", "OR", "NOT"}:
             value = value.upper()
@@ -151,13 +162,15 @@ def tokenize(code: str):
         if kind == "BOOLEAN":
             value = value.lower()
 
-        # ✅ normalize variable names (case-insensitive)
+        # ✅ normalize variable names
         if kind in {"LOCAL_VAR", "GLOBAL_VAR"}:
             value = value.lower()
 
-        tokens.append(Token(kind, value))
+        tokens.append(Token(kind, value, line, column))
 
-    debug("TOKENS", tokens)
+    # ✅ enhanced debug
+    debug("TOKENS", [f"{t} @({t.line},{t.column})" for t in tokens])
+
     return tokens
 
 def register_operator_token(symbol, token_name=None):
@@ -197,8 +210,3 @@ def _safe_token_name(symbol):
         .replace(">=", "GE")
         .replace("<=", "LE")
     )
-
-
-def register_operator_token(symbol, token_name=None):
-    token_name = token_name or _safe_token_name(symbol)
-    DYNAMIC_OPERATORS[token_name] = re.escape(symbol)
