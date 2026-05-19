@@ -132,9 +132,6 @@ class ASTEvaluator:
                 return result
 
             if isinstance(node, DoNode):
-            
-                print("\n=== DO LOOP START ===")
-                print("MODE:", node.mode)
 
                 # --------------------------
                 # ✅ 1. INDICES LOOP
@@ -149,7 +146,6 @@ class ASTEvaluator:
                     array_obj = iter_value
 
                     for key in sorted(array_obj.value.keys()):
-                        print(f"[INDICES] {node.var} = {key}")
 
                         # ✅ loop variable = actual index
                         self.env.set(node.var, Real(key), False)
@@ -177,7 +173,6 @@ class ASTEvaluator:
                     array_obj = iter_value
 
                     for val in array_obj.value.values():
-                        print(f"[VALUES] {node.var} = {val}")
 
                         # ✅ loop variable = value
                         self.env.set(node.var, val, False)
@@ -209,8 +204,6 @@ class ASTEvaluator:
                             break
                         if step_val < 0 and i < end_val:
                             break
-                        
-                        print(f"[RANGE] {node.var} = {i}")
 
                         self.env.set(node.var, Real(i), False)
 
@@ -1088,8 +1081,6 @@ class ASTEvaluator:
     
     def _build_cache(self, cls):
 
-        print(f"[DEBUG] Building cache for: {cls}")
-
         method_map = {}
         operator_map = {}
 
@@ -1138,9 +1129,6 @@ class ASTEvaluator:
                             continue
 
                         operator_map[symbol] = member
-
-        print(f"[DEBUG] Methods found for {cls}: {list(method_map.keys())}")
-        print(f"[DEBUG] Operators found for {cls}: {list(operator_map.keys())}")
 
         self._method_cache[cls] = method_map
         self._operator_cache[cls] = operator_map

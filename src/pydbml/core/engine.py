@@ -7,7 +7,7 @@ from pydbml.runtime.resolver import ResourceResolver
 import os, importlib.util
 from pydbml.execution.signals import GoLabelSignal, ReturnSignal
 from pydbml.ast.nodes import LabelNode, DoNode, IfNode, HandleNode
-
+from pydbml.execution.ast_optimizer import ASTOptimizer
 
 class Engine:
     """
@@ -30,6 +30,7 @@ class Engine:
         
         debug("CODE", code)
         ast = parser.parse()
+        ast = ASTOptimizer().optimize(ast)
         debug("AST", ast)
 
         label_map = self._collect_labels(ast)
