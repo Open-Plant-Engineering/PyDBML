@@ -196,35 +196,7 @@ class Parser:
         
             save_pos = self.pos
 
-            left = self._parse_primary()
-
-            # ✅ allow full postfix chain: [ ] and .
-            while True:
-            
-                if self._match("LBRACKET"):
-                    self._consume()
-                    index_expr = self.expression()
-                    self._consume_expected("RBRACKET")
-                    left = IndexAccessNode(left, index_expr)
-                    continue
-                
-                if self._match("DOT"):
-                    self._consume()
-                    attr_token = self._consume()
-
-                    if attr_token.type not in (
-                        "IDENTIFIER",
-                        "AND", "OR", "NOT",
-                        "EQ_KW", "NEQ_KW",
-                        "GT_KW", "LT_KW",
-                        "GE_KW", "LE_KW"
-                    ):
-                        raise SyntaxError("Expected attribute name after '.'")
-
-                    left = DotAccessNode(left, attr_token.value.lower())
-                    continue
-                
-                break
+            left = self._expr_bp()
             
             # ✅ assignment
             if self._match("EQUAL"):
