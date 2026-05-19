@@ -272,129 +272,6 @@ class Parser:
 
         return self._expr_bp()
 
-    def _parse_comparison(self):
-        node = self._parse_term()
-
-        while self._match( "EQ", "NE", "GT", "LT", "GE", "LE",
-            "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW", "AMP"
-        ):
-            op_token = self._consume()
-            op_map = {
-                "EQ": "==",
-                "NE": "!=",
-                "GT": ">",
-                "LT": "<",
-                "GE": ">=",
-                "LE": "<=",
-                
-                # PML1 keywords ✅
-                "EQ_KW": "==",
-                "NEQ_KW": "!=",
-                "GT_KW": ">",
-                "LT_KW": "<",
-                "GE_KW": ">=",
-                "LE_KW": "<=",
-                "AMP": "&"
-            }
-            op = op_map[op_token.type]
-            right = self._parse_term()
-            node = BinaryOpNode(node, op, right, token=op_token)
-
-        return node
-
-    def _parse_term(self):
-        node = self._parse_factor()
-
-        while self._match("PLUS", "MINUS"):
-            op_token = self._consume()
-            op = op_token.value
-            right = self._parse_factor()
-            node = BinaryOpNode(node, op, right, token=op_token)
-
-        return node
-
-    def _parse_factor(self):
-        # ✅ unary minus first
-        if self._match("MINUS"):
-            self._consume()
-            operand = self._parse_factor()
-            return BinaryOpNode(NumberNode(0), "-", operand)
-
-        # ✅ start with primary
-        node = self._parse_primary()
-
-        # ✅ UNIFIED postfix handling (INDEX + DOT + CALL)
-        while True:
-
-            # --------------------------
-            # Index access
-            # --------------------------
-            if self._match("LBRACKET"):
-                self._consume()
-                index_expr = self.expression()
-                self._consume_expected("RBRACKET")
-                node = IndexAccessNode(node, index_expr, token=index_expr.token)
-                continue
-
-            # --------------------------
-            # Dot access / method call
-            # --------------------------
-            if self._match("DOT"):
-                self._consume()
-                attr_token = self._consume()
-
-                if attr_token.type not in (
-                    "IDENTIFIER",
-                    "AND", "OR", "NOT",
-                    "EQ_KW", "NEQ_KW", "GT_KW", "LT_KW", "GE_KW", "LE_KW"
-                ):
-                    raise SyntaxError("Expected attribute name after '.'")
-
-                method_name = attr_token.value.lower()
-
-                # ✅ method call
-                if self._match("LPAREN"):
-                    self._consume()
-
-                    args = []
-                    if not self._match("RPAREN"):
-                        args.append(self._expr_bp())
-
-                        while self._match("COMMA"):
-                            self._consume()
-                            args.append(self._expr_bp())
-
-                    self._consume_expected("RPAREN")
-                    node = CallNode(node, method_name, args, token=attr_token)
-
-                # ✅ attribute access
-                else:
-                    node = DotAccessNode(node, method_name, token=attr_token)
-
-                continue
-
-            break
-
-        while True:
-        
-            if self._match("MUL", "DIV"):
-                op_token = self._consume()
-                op = op_token.value
-
-            else:
-                token = self._peek()
-
-                if token and token.type.startswith("OP_"):
-                    op_token = self._consume()
-                    op = op_token.value
-                else:
-                    break
-                
-            right = self._parse_primary()
-            node = BinaryOpNode(node, op, right, token=op_token)
-
-        return node
-
     def _parse_primary(self):
         token = self._consume()
 
@@ -576,35 +453,6 @@ class Parser:
         self._consume_expected("ENDIF")
 
         return IfNode(condition, then_branch, else_branch, is_expression=False)
-
-    def _parse_or(self):
-        node = self._parse_and()
-
-        while self._match("OR"):
-            op_token = self._consume()
-            right = self._parse_and()
-            node = LogicalOpNode(node, "OR", right, token=op_token)
-
-        return node
-
-    def _parse_and(self):
-        node = self._parse_not()
-
-        while self._match("AND"):
-            op_token = self._consume()
-            right = self._parse_not()
-            from pydbml.ast.nodes import LogicalOpNode
-            node = LogicalOpNode(node, "AND", right, token=op_token)
-
-        return node
-
-    def _parse_not(self):
-        if self._match("NOT"):
-            self._consume()
-            from pydbml.ast.nodes import NotNode
-            return NotNode(self._parse_not())
-
-        return self._parse_comparison()
 
     def _is_index_assignment(self):
         """
@@ -1098,29 +946,7 @@ class Parser:
             op_token = self._consume()
 
             # ✅ map operator
-            op_map = {
-                "PLUS": "+",
-                "MINUS": "-",
-                "MUL": "*",
-                "DIV": "/",
-
-                "EQ": "==", "NE": "!=", "GT": ">", "LT": "<",
-                "GE": ">=", "LE": "<=",
-
-                "EQ_KW": "==", "NEQ_KW": "!=",
-                "GT_KW": ">", "LT_KW": "<",
-                "GE_KW": ">=", "LE_KW": "<=",
-
-                "AND": "AND",
-                "OR": "OR",
-            }
-
-            op = op_map.get(op_token.type, op_token.value)
-
-            if op_token.type == "AMP":
-                op = "&"
-            elif op_token.type.startswith("OP_"):
-                op = op_token.value
+            op = self._get_operator(op_token)
 
             # ✅ right side (higher precedence)
             right = self._expr_bp(bp + 1)
@@ -1181,3 +1007,31 @@ class Parser:
             break
 
         return node
+
+    def _get_operator(self, token):
+        op_map = {
+            "PLUS": "+",
+            "MINUS": "-",
+            "MUL": "*",
+            "DIV": "/",
+
+            "EQ": "==", "NE": "!=", "GT": ">", "LT": "<",
+            "GE": ">=", "LE": "<=",
+
+            "EQ_KW": "==", "NEQ_KW": "!=",
+            "GT_KW": ">", "LT_KW": "<",
+            "GE_KW": ">=", "LE_KW": "<=",
+
+            "AND": "AND",
+            "OR": "OR",
+        }
+
+        op = op_map.get(token.type, token.value)
+
+        if token.type == "AMP":
+            return "&"
+
+        if token.type.startswith("OP_"):
+            return token.value
+
+        return op
