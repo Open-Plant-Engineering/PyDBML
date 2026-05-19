@@ -359,10 +359,20 @@ class Parser:
 
             break
 
-        # ✅ multiplication / division (higher precedence)
-        while self._match("MUL", "DIV"):
-            op = self._consume().value
-            right = self._parse_factor()   # ✅ recursive for chaining
+        while True:
+        
+            if self._match("MUL", "DIV"):
+                op = self._consume().value
+
+            else:
+                token = self._peek()
+
+                if token and token.type.startswith("OP_"):
+                    op = self._consume().value
+                else:
+                    break
+                
+            right = self._parse_primary()
             node = BinaryOpNode(node, op, right)
 
         return node
@@ -1040,3 +1050,4 @@ class Parser:
         if self._match("HANDLE"):
             return self._parse_handle(stmt)
         return stmt
+

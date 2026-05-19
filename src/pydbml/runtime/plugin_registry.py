@@ -3,6 +3,7 @@ import pydbml.types.real as real
 import pydbml.types.string as string
 import pydbml.types.boolean as boolean
 import pydbml.types.array as array
+from pydbml.lexer.tokenizer import register_operator_token
 
 class PluginRegistry:
     def __init__(self):
@@ -11,6 +12,7 @@ class PluginRegistry:
         self.operators = {}
         self.extended_classes = set()
         self._load_builtins()
+        self.extensions = {} 
 
     def register_module(self, module):
         print(f"\n[DEBUG] Registering module: {module}")
@@ -30,6 +32,7 @@ class PluginRegistry:
                     method = getattr(obj, attr)
                     if hasattr(method, "_pydbml_operator"):
                         for op in method._pydbml_operator_names:
+                            register_operator_token(op)
                             self.operators[(name.lower(), op)] = attr
 
             # ✅ function
@@ -59,8 +62,17 @@ class PluginRegistry:
                         member = getattr(obj, attr)
 
                         if callable(member):
+                        
+                            # ✅ operator from extension → register token
+                            if hasattr(member, "_pydbml_operator"):
+                                for op in member._pydbml_operator_names:
+                                    print(f"[DEBUG] Registering operator token (extension): {op}")
+                                    register_operator_token(op)
+
                             if hasattr(member, "_pydbml_method") or hasattr(member, "_pydbml_operator"):
-                                setattr(target_cls, attr, member)
+                                if target_cls not in self.extensions:
+                                    self.extensions[target_cls] = []
+                                    self.extensions[target_cls].append(obj)
 
                     # ✅ mark cache dirty
                     self.extended_classes.add(target_cls)

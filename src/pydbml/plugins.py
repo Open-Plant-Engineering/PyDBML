@@ -113,7 +113,7 @@ def pydbml_function(*names):
     return wrapper
 
 
-def pydbml_operator(*symbols):
+def pydbml_operator(*symbols, override=False, priority=0):
     """
     Always requires symbol:
     @pydbml_operator("+","&")
@@ -126,6 +126,10 @@ def pydbml_operator(*symbols):
 
         for symbol in symbols:
             func._pydbml_operator_names.add(symbol)
+                
+        func._pydbml_operator_override = override
+        func._pydbml_operator_priority = priority
+
         return func
     return wrapper
 

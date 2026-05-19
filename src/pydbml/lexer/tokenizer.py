@@ -2,6 +2,7 @@ import re
 from pydbml.lexer.tokens import Token
 from pydbml.utils.debug import debug
 
+DYNAMIC_OPERATORS = {}
 TOKEN_SPEC = [
     
     ("COMMENT_BLOCK", r"\$\([\s\S]*?\$\)"),
@@ -124,14 +125,18 @@ TOKEN_SPEC = [
     ("IDENTIFIER", r"[a-zA-Z_]\w*"),
 ]
 
-
-TOKEN_REGEX = "|".join(f"(?P<{name}>{pattern})" for name, pattern in TOKEN_SPEC)
+BUILTIN_OPERATORS = {
+    "+", "-", "*", "/", "&",
+    "==", "!=", ">", "<", ">=", "<="
+}
 
 
 def tokenize(code: str):
     tokens = []
+    
+    regex = build_token_regex()
 
-    for match in re.finditer(TOKEN_REGEX, code, flags=re.IGNORECASE):
+    for match in re.finditer(regex, code, flags=re.IGNORECASE):
         kind = match.lastgroup
         value = match.group()
 
@@ -154,3 +159,46 @@ def tokenize(code: str):
 
     debug("TOKENS", tokens)
     return tokens
+
+def register_operator_token(symbol, token_name=None):
+    token_name = token_name or _safe_token_name(symbol)
+
+    DYNAMIC_OPERATORS[token_name] = re.escape(symbol)
+
+def build_token_regex():
+    spec = TOKEN_SPEC.copy()
+
+    insert_index = len(spec) - 1
+
+    # ✅ add dynamic operators
+    for name, pattern in DYNAMIC_OPERATORS.items():
+        spec.insert(insert_index, (name, pattern))
+        insert_index += 1
+        # insert before IDENTIFIER
+
+    return "|".join(f"(?P<{name}>{pattern})" for name, pattern in spec)
+
+def _safe_token_name(symbol):
+    return "OP_" + (
+        symbol
+        .replace("+", "PLUS")
+        .replace("-", "MINUS")
+        .replace("*", "MUL")
+        .replace("/", "DIV")
+        .replace("%", "MOD")
+        .replace("^", "POW")
+        .replace("&", "AMP")
+        .replace("=", "EQ")
+        .replace("!", "NOT")
+        .replace("<", "LT")
+        .replace(">", "GT")
+        .replace("==", "EQ")
+        .replace("!=", "NE")
+        .replace(">=", "GE")
+        .replace("<=", "LE")
+    )
+
+
+def register_operator_token(symbol, token_name=None):
+    token_name = token_name or _safe_token_name(symbol)
+    DYNAMIC_OPERATORS[token_name] = re.escape(symbol)
