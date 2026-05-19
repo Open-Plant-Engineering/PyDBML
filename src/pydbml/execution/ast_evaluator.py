@@ -53,20 +53,23 @@ class ASTEvaluator:
         self._method_cache = {}
         self._operator_cache = {}
         self.call_stack = []
+        self.debug_mode = False
+        self.step_mode = False
+        self.breakpoints = set()
 
     def evaluate(self, node):
         try:
             if node is None:
                 return None
             
+            debug("NODE START", node)
             self.call_stack.append(node)
+            self._trace(node)
 
             if isinstance(node, GoLabelNode):
                 raise GoLabelSignal(node.name)
             if isinstance(node, LabelNode):
                 return None
-    
-            debug("NODE START", node)
 
             if callable(node):
                 return node()
@@ -1134,3 +1137,76 @@ class ASTEvaluator:
 
         self._method_cache[cls] = method_map
         self._operator_cache[cls] = operator_map
+    
+    def _trace(self, node):
+        if not self.debug_mode:
+            return
+
+        token = getattr(node, "token", None)
+
+        if token:
+            line = token.line
+            col = token.column
+            print(f"[STEP] Line {line}:{col} → {node.__class__.__name__}")
+        else:
+            line = None
+            print(f"[STEP] → {node.__class__.__name__}")
+
+        # ✅ break condition
+        should_pause = self.step_mode or (line in self.breakpoints if line else False)
+
+        if not should_pause:
+            return
+
+        # ✅ interactive debugger loop
+        while True:
+            cmd = input("(debug) ").strip()
+
+            if cmd in ("c", "continue"):
+                self.step_mode = False
+                return
+
+            elif cmd in ("s", "step"):
+                self.step_mode = True
+                return
+
+            elif cmd.startswith("p"):
+                parts = cmd.split()
+
+                # ✅ print all variables
+                if len(parts) == 1:
+                    print("Variables:")
+                    for scope in reversed(self.env.scopes):
+                        for name, var in scope.items():
+                            try:
+                                val = var.get()
+                            except Exception:
+                                val = var
+                            print(f"  {name} = {val}")
+                    continue
+                
+                # ✅ print specific variable
+                var_name = parts[1]
+                try:
+                    val = self.env.get(var_name).get()
+                    print(f"{var_name} = {val}")
+                except Exception:
+                    print(f"{var_name} not found")
+
+            elif cmd in ("q", "quit"):
+                raise SystemExit("Debugger exited")
+            
+            elif cmd in ("bt", "stack"):
+                print("Call stack:")
+                for n in reversed(self.call_stack):
+                    t = getattr(n, "token", None)
+                    if t:
+                        print(f"  Line {t.line}:{t.column} → {n.__class__.__name__}")
+                    else:
+                        print(f"  → {n.__class__.__name__}")
+                        
+            else:
+                print("Commands: c(continue), s(step), p var, q(quit)")
+
+    def add_breakpoint(self, line):
+        self.breakpoints.add(line)
