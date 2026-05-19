@@ -904,17 +904,41 @@ class Parser:
 
     def _is_assignment(self):
         pos = self.pos
-
+    
+        # ✅ must start with variable
+        first = self._peek()
+        if not first or first.type not in ("LOCAL_VAR", "GLOBAL_VAR"):
+            return False
+    
+        pos += 1
+    
+        # ✅ allow postfix chain: [ ] and .
         while pos < len(self.tokens):
             t = self.tokens[pos]
-
-            if t.type == "EQUAL":
-                return True
-
-            # stop if statement boundary hit (optional safeguard)
-            if t.type in ("THEN", "ENDIF", "ELSE", "ENDDO"):
-                return False
-
-            pos += 1
-
+    
+            # ✅ index access
+            if t.type == "LBRACKET":
+                depth = 1
+                pos += 1
+    
+                while pos < len(self.tokens) and depth > 0:
+                    if self.tokens[pos].type == "LBRACKET":
+                        depth += 1
+                    elif self.tokens[pos].type == "RBRACKET":
+                        depth -= 1
+                    pos += 1
+                continue
+            
+            # ✅ dot access
+            if t.type == "DOT":
+                pos += 2   # skip DOT + IDENTIFIER
+                continue
+            
+            break
+        
+        # ✅ now must be '='
+        if pos < len(self.tokens) and self.tokens[pos].type == "EQUAL":
+            return True
+    
         return False
+    
