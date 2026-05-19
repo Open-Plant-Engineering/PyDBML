@@ -128,3 +128,32 @@ def pydbml_operator(*symbols):
             func._pydbml_operator_names.add(symbol)
         return func
     return wrapper
+
+def pydbml_extend(*names):
+    """
+    Supports:
+    @pydbml_extend
+    @pydbml_extend("number", "string","real","array")
+    """
+    def wrapper(cls):
+        cls._pydbml_extend = True
+
+        if not hasattr(cls, "_pydbml_extend_names"):
+            cls._pydbml_extend_names = set()
+
+        # ✅ default: use class name
+        if not names:
+            cls._pydbml_extend_names.add(cls.__name__.lower())
+        else:
+            for name in names:
+                cls._pydbml_extend_names.add(name.lower())
+
+        return cls
+
+    # ✅ support @pydbml_extend without ()
+    if len(names) == 1 and callable(names[0]):
+        cls = names[0]
+        names = ()
+        return wrapper(cls)
+
+    return wrapper

@@ -559,10 +559,12 @@ class ASTEvaluator:
 
 
             if isinstance(node, CallNode):
-            
+
                 target = self.evaluate(node.target)
                 args = [self.evaluate(arg) for arg in node.args]
                 method_name = node.method.lower()
+
+                print(f"[DEBUG] Calling method '{method_name}'")
 
                 # --------------------------
                 # ✅ Case 1: Object method
@@ -994,27 +996,41 @@ class ASTEvaluator:
     
     def _build_cache(self, cls):
         """
-        Build method + operator cache for a class (only once)
+        Build method + operator cache for a class (correct + safe)
         """
-
-        if cls in self._method_cache:
-            return
-
-        method_map = {}
-        operator_map = {}
-
-        for attr in dir(cls):
-            member = getattr(cls, attr)
-
-            # ✅ method
-            if callable(member) and hasattr(member, "_pydbml_method"):
-                for name in member._pydbml_method_names:
-                    method_map[name] = member
-
-            # ✅ operator
-            if callable(member) and hasattr(member, "_pydbml_operator"):
-                for symbol in member._pydbml_operator_names:
-                    operator_map[symbol] = member
-
-        self._method_cache[cls] = method_map
-        self._operator_cache[cls] = operator_map
+    
+        print(f"[DEBUG] Building cache for: {cls}")
+    
+        # ✅ Always rebuild if not present OR extension happened
+        if cls not in self._method_cache or cls in self.registry.extended_classes:
+        
+            # ✅ clear old cache safely
+            self._method_cache.pop(cls, None)
+            self._operator_cache.pop(cls, None)
+    
+            # ✅ remove dirty flag
+            if cls in self.registry.extended_classes:
+                self.registry.extended_classes.remove(cls)
+    
+            method_map = {}
+            operator_map = {}
+    
+            for attr in dir(cls):
+                member = getattr(cls, attr)
+    
+                # ✅ METHODS
+                if callable(member) and hasattr(member, "_pydbml_method"):
+                    for name in member._pydbml_method_names:
+                        method_map[name] = member
+    
+                # ✅ OPERATORS
+                if callable(member) and hasattr(member, "_pydbml_operator"):
+                    for symbol in member._pydbml_operator_names:
+                        operator_map[symbol] = member
+    
+            print(f"[DEBUG] Methods found for {cls}: {list(method_map.keys())}")
+            print(f"[DEBUG] Operators found for {cls}: {list(operator_map.keys())}")
+    
+            # ✅ ALWAYS SAVE (THIS FIXES EVERYTHING)
+            self._method_cache[cls] = method_map
+            self._operator_cache[cls] = operator_map
