@@ -110,9 +110,9 @@ TOKEN_SPEC = [
     ("EQUAL", r"="),
 
     # --------------------------
-    # Whitespace
+    # Control keywords / late keywords
     # --------------------------
-    ("IMPORT", r"import"),
+    ("IMPORT", r"\bimport\b"),
     ("DO", r"\bdo\b"),
     ("ENDDO", r"\benddo\b"),
     ("BREAK", r"\bbreak\b"),
@@ -123,6 +123,7 @@ TOKEN_SPEC = [
     
     # ✅ ALWAYS LAST
     ("IDENTIFIER", r"[a-zA-Z_]\w*"),
+    ("WHITESPACE", r"\s+"),
 ]
 
 BUILTIN_OPERATORS = {
@@ -130,53 +131,82 @@ BUILTIN_OPERATORS = {
     "==", "!=", ">", "<", ">=", "<="
 }
 
+_COMPILED_REGEX = None
 
 def tokenize(code: str):
+    """
+    Tokenizer (Lexer) for PyDBML.
+
+    Responsibilities:
+        ✔ converts raw code → tokens
+        ✔ tracks positions (line, column)
+        ✔ normalizes token values
+        ✔ supports dynamic operator injection
+
+    Design:
+        - regex-based lexer
+        - ordered token priority system
+        - extensible via plugin operators
+
+    Notes:
+        - keyword order matters (must appear before IDENTIFIER)
+        - dynamic operators inserted before IDENTIFIER
+    """
+
+    global _COMPILED_REGEX
+
+    if _COMPILED_REGEX is None:
+        _COMPILED_REGEX = re.compile(build_token_regex(), re.IGNORECASE)
+
     tokens = []
 
-    regex = build_token_regex()
+    matches = list(_COMPILED_REGEX.finditer(code))
 
-    for match in re.finditer(regex, code, flags=re.IGNORECASE):
+    # ✅ strict validation (no gaps)
+    pos = 0
+    for match in matches:
+        if match.start() != pos:
+            raise SyntaxError(f"Unexpected character at position {pos}")
+        pos = match.end()
+
+    if pos != len(code):
+        raise SyntaxError(f"Unexpected character at position {pos}")
+
+    # ✅ token creation
+    for match in matches:
         kind = match.lastgroup
         value = match.group()
 
-        if kind in ("COMMENT_LINE", "COMMENT_BLOCK"):
+        if kind in ("COMMENT_LINE", "COMMENT_BLOCK", "WHITESPACE"):
             continue
 
-        # ✅ line & column tracking
         start = match.start()
-
         line = code.count("\n", 0, start) + 1
         last_newline = code.rfind("\n", 0, start)
-
-        if last_newline < 0:
-            last_newline = -1
-
+        last_newline = last_newline if last_newline >= 0 else -1
         column = start - last_newline
 
-        # ✅ normalize keywords
         if kind in {"IF", "THEN", "ELSE", "AND", "OR", "NOT"}:
             value = value.upper()
 
-        # ✅ normalize boolean
         if kind == "BOOLEAN":
             value = value.lower()
 
-        # ✅ normalize variable names
         if kind in {"LOCAL_VAR", "GLOBAL_VAR"}:
             value = value.lower()
 
         tokens.append(Token(kind, value, line, column))
 
-    # ✅ enhanced debug
-    debug("TOKENS", [f"{t} @({t.line},{t.column})" for t in tokens])
-
     return tokens
 
 def register_operator_token(symbol, token_name=None):
+    global _COMPILED_REGEX
+
     token_name = token_name or _safe_token_name(symbol)
 
-    DYNAMIC_OPERATORS[token_name] = re.escape(symbol)
+    if token_name not in DYNAMIC_OPERATORS:
+        DYNAMIC_OPERATORS[token_name] = re.escape(symbol)
+        _COMPILED_REGEX = None  # ✅ only invalidate when new
 
 def build_token_regex():
     spec = TOKEN_SPEC.copy()
@@ -184,7 +214,7 @@ def build_token_regex():
     insert_index = len(spec) - 1
 
     # ✅ add dynamic operators
-    for name, pattern in DYNAMIC_OPERATORS.items():
+    for name, pattern in sorted(DYNAMIC_OPERATORS.items()):
         spec.insert(insert_index, (name, pattern))
         insert_index += 1
         # insert before IDENTIFIER
@@ -205,7 +235,6 @@ def _safe_token_name(symbol):
         .replace("!", "NOT")
         .replace("<", "LT")
         .replace(">", "GT")
-        .replace("==", "EQ")
         .replace("!=", "NE")
         .replace(">=", "GE")
         .replace("<=", "LE")
