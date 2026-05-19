@@ -580,8 +580,6 @@ class ASTEvaluator:
                 args = [self.evaluate(arg) for arg in node.args]
                 method_name = node.method.lower()
 
-                print(f"[DEBUG] Calling method '{method_name}'")
-
                 # --------------------------
                 # ✅ Case 1: Object method
                 # --------------------------
