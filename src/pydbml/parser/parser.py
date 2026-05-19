@@ -28,6 +28,7 @@ from pydbml.ast.nodes import (
     GoLabelNode,
     LabelNode,
     LogicalOpNode,
+    NotNode,
 )
 from pydbml.utils.debug import debug
 
@@ -35,6 +36,19 @@ class Parser:
     def __init__(self, code: str):
         self.tokens = tokenize(code)
         self.pos = 0
+        self.precedence = {
+            "OR": 10,
+            "AND": 20,
+
+            "EQ": 30, "NE": 30, "GT": 30, "LT": 30, "GE": 30, "LE": 30,
+            "EQ_KW": 30, "NEQ_KW": 30, "GT_KW": 30, "LT_KW": 30, "GE_KW": 30, "LE_KW": 30,
+
+            "PLUS": 40, "MINUS": 40,
+
+            "MUL": 50, "DIV": 50,
+
+            "AMP": 40,
+        }
 
     # --------------------------
     # Entry
@@ -256,7 +270,7 @@ class Parser:
         if self._match("IF"):
             return self._parse_if()
 
-        return self._parse_or()
+        return self._expr_bp()
 
     def _parse_comparison(self):
         node = self._parse_term()
@@ -344,11 +358,11 @@ class Parser:
 
                     args = []
                     if not self._match("RPAREN"):
-                        args.append(self.expression())
+                        args.append(self._expr_bp())
 
                         while self._match("COMMA"):
                             self._consume()
-                            args.append(self.expression())
+                            args.append(self._expr_bp())
 
                     self._consume_expected("RPAREN")
                     node = CallNode(node, method_name, args, token=attr_token)
@@ -431,11 +445,11 @@ class Parser:
         
             # ✅ parse arguments
             if not self._match("RPAREN"):
-                args.append(self.expression())
+                args.append(self._expr_bp())
         
                 while self._match("COMMA"):
                     self._consume()
-                    args.append(self.expression())
+                    args.append(self._expr_bp())
         
             self._consume_expected("RPAREN")
         
@@ -449,11 +463,11 @@ class Parser:
                 self._consume()  # (
                 args = []
                 if not self._match("RPAREN"):
-                    args.append(self.expression())
+                    args.append(self._expr_bp())
 
                     while self._match("COMMA"):
                         self._consume()
-                        args.append(self.expression())
+                        args.append(self._expr_bp())
 
                 self._consume_expected("RPAREN")
 
@@ -1054,3 +1068,116 @@ class Parser:
             return self._parse_handle(stmt)
         return stmt
 
+    def _expr_bp(self, min_bp=0):
+        # ✅ parse left side
+        if self._match("NOT"):
+            op_token = self._consume()
+            operand = self._expr_bp(30)
+            left = NotNode(operand)
+        elif self._match("MINUS"):
+            op_token = self._consume()
+            operand = self._expr_bp(60)
+            left = BinaryOpNode(NumberNode(0), "-", operand)
+        else:
+            left = self._parse_primary()
+
+        left = self._parse_postfix(left)
+
+        while True:
+            token = self._peek()
+            if token is None:
+                break
+
+            if token.type not in self.precedence and not token.type.startswith("OP_"):
+                break
+
+            bp = self.precedence.get(token.type, 50)
+            if bp < min_bp:
+                break
+
+            op_token = self._consume()
+
+            # ✅ map operator
+            op_map = {
+                "PLUS": "+",
+                "MINUS": "-",
+                "MUL": "*",
+                "DIV": "/",
+
+                "EQ": "==", "NE": "!=", "GT": ">", "LT": "<",
+                "GE": ">=", "LE": "<=",
+
+                "EQ_KW": "==", "NEQ_KW": "!=",
+                "GT_KW": ">", "LT_KW": "<",
+                "GE_KW": ">=", "LE_KW": "<=",
+
+                "AND": "AND",
+                "OR": "OR",
+            }
+
+            op = op_map.get(op_token.type, op_token.value)
+
+            if op_token.type == "AMP":
+                op = "&"
+            elif op_token.type.startswith("OP_"):
+                op = op_token.value
+
+            # ✅ right side (higher precedence)
+            right = self._expr_bp(bp + 1)
+            right = self._parse_postfix(right)
+
+            # ✅ logical vs binary
+            if op in ("AND", "OR"):
+                left = LogicalOpNode(left, op, right, token=op_token)
+            else:
+                left = BinaryOpNode(left, op, right, token=op_token)
+
+        return left
+    
+    def _parse_postfix(self, node):
+        while True:
+
+            # --------------------------
+            # Index access
+            # --------------------------
+            if self._match("LBRACKET"):
+                self._consume()
+                index = self._expr_bp()
+                self._consume_expected("RBRACKET")
+                node = IndexAccessNode(node, index, token=index.token)
+                continue
+
+            # --------------------------
+            # Dot access / method call
+            # --------------------------
+            if self._match("DOT"):
+                self._consume()
+
+                attr_token = self._consume()
+
+                method_name = attr_token.value.lower()
+
+                # ✅ method call
+                if self._match("LPAREN"):
+                    self._consume()
+
+                    args = []
+                    if not self._match("RPAREN"):
+                        args.append(self._expr_bp())
+
+                        while self._match("COMMA"):
+                            self._consume()
+                            args.append(self._expr_bp())
+
+                    self._consume_expected("RPAREN")
+
+                    node = CallNode(node, method_name, args, token=attr_token)
+
+                else:
+                    node = DotAccessNode(node, method_name, token=attr_token)
+
+                continue
+
+            break
+
+        return node
