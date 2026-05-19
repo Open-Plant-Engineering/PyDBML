@@ -43,6 +43,7 @@ import importlib
 import importlib.util
 from pydbml.runtime.plugin_registry import PluginRegistry
 from pydbml.runtime.exceptions import PyDBMLError
+from pydbml.runtime.error_codes import raise_error
 
 class ASTEvaluator:
     def __init__(self, env, resolver=None):
@@ -481,8 +482,10 @@ class ASTEvaluator:
                         # evaluate arguments
                         arg_values = [self.evaluate(arg) for arg in node.args]
                         if len(arg_values) != len(func_ast.params):
-                            raise Exception(
-                                f"{name} expects {len(func_ast.params)} args, got {len(arg_values)}"
+                            raise raise_error(
+                                "ARG_COUNT",
+                                f"{name} expects {len(func_ast.params)} args, got {len(arg_values)}",
+                                node=node
                             )
 
                         self.env.push_scope()
@@ -612,7 +615,11 @@ class ASTEvaluator:
                 
                     return self._to_pydbml(result)
 
-                raise Exception(f"Method '{method_name}' not found for type '{type(target).__name__}'")
+                raise raise_error(
+                    "METHOD_NOT_FOUND",
+                    f"{method_name} for type '{type(target).__name__}'",
+                    node=node
+                )
 
             # --------------------------
             # DOT ACCESS
@@ -757,7 +764,11 @@ class ASTEvaluator:
                 debug("OPERATOR", node.op)
 
                 if not isinstance(left, Boolean) or not isinstance(right, Boolean):
-                    raise TypeError("Logical operations require BOOLEAN values")
+                    raise raise_error(
+                        "TYPE_ERROR",
+                        "Logical operations require BOOLEAN values",
+                        node=node
+                    )
 
                 if node.op == "AND":
                     return Boolean(left.value and right.value)
@@ -772,7 +783,11 @@ class ASTEvaluator:
                 condition = self.evaluate(node.condition)
 
                 if not isinstance(condition, Boolean):
-                    raise TypeError("IF condition must be BOOLEAN")
+                    raise raise_error(
+                        "TYPE_ERROR",
+                        "IF condition must be BOOLEAN",
+                        node=node
+                    )
 
                 # ✅ Expression IF
                 if node.is_expression:
@@ -879,8 +894,11 @@ class ASTEvaluator:
                     result = method(py_right)
                     return self._to_pydbml(result)
 
-                raise Exception(
-                    f"Operator '{node.op}' not supported for type '{type(left).__name__}'"
+                
+                raise raise_error(
+                    "OPERATOR_ERROR",
+                    f"{node.op} not supported for {type(left).__name__}",
+                    node=node
                 )
 
         except Exception as e:
@@ -899,7 +917,12 @@ class ASTEvaluator:
                 raise
             
             # ✅ only unexpected/internal errors → wrap
-            raise PyDBMLError(99, 1, str(e),  node=node, stack=self.call_stack.copy() )
+            raise raise_error(
+                "INTERNAL",
+                str(e),
+                node=node,
+                stack=self.call_stack.copy()
+            )
 
         finally:
             if self.call_stack:
