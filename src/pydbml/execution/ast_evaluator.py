@@ -665,39 +665,8 @@ class ASTEvaluator:
             # IF Node
             # --------------------------
             if isinstance(node, IfNode):
-                condition = self.evaluate(node.condition)
-
-                if not isinstance(condition, Boolean):
-                    raise raise_error(
-                        "TYPE_ERROR",
-                        "IF condition must be BOOLEAN",
-                        node=node
-                    )
-
-                # ✅ Expression IF
-                if node.is_expression:
-                    if condition.value:
-                        result = self.evaluate(node.then_branch)
-                    else:
-                        result = self.evaluate(node.else_branch)
-
-                    return result
-
-                # ✅ Block IF
-                if condition.value:
-                    result = None
-                    for stmt in node.then_branch:
-                        result = self.evaluate(stmt)
-                    return result
-
-                if node.else_branch is not None:
-                    result = None
-                    for stmt in node.else_branch:
-                        result = self.evaluate(stmt)
-                    return result
-
-                return None
-
+                return self._eval_if(node)
+                
             # --------------------------
             # Assignment
             # --------------------------
@@ -752,43 +721,7 @@ class ASTEvaluator:
             # Binary Operation
             # --------------------------
             if isinstance(node, BinaryOpNode):
-                left = self.evaluate(node.left)
-                right = self.evaluate(node.right)
-
-                # ✅ unwrap plugin objects
-                if isinstance(left, PluginObject):
-                    left = left.obj
-
-                if isinstance(right, PluginObject):
-                    right = right.obj
-
-                debug("BINOP LEFT", left)
-                debug("BINOP RIGHT", right)
-                debug("BINOP OP", node.op)
-
-                # =====================================================
-                # ✅ FAST OPERATOR LOOKUP (NEW)
-                # =====================================================
-                cls = left.__class__
-
-                if cls not in self._method_cache:
-                    self._build_cache(cls)
-
-                operator_map = self._operator_cache[cls]
-
-                if node.op in operator_map:
-                    # ✅ bind method
-                    method = operator_map[node.op].__get__(left, cls)
-                    py_right = self._to_python(right)
-                    result = method(py_right)
-                    return self._to_pydbml(result)
-
-                
-                raise raise_error(
-                    "OPERATOR_ERROR",
-                    f"{node.op} not supported for {type(left).__name__}",
-                    node=node
-                )
+                return self._eval_binary(node)
 
         except Exception as e:
             # ✅ control flow → never touch
@@ -1202,3 +1135,73 @@ class ASTEvaluator:
                 f"{type_name} does not accept arguments",
                 node=node
             )
+
+    def _eval_if(self, node):
+        condition = self.evaluate(node.condition)
+
+        if not isinstance(condition, Boolean):
+            raise raise_error(
+                "TYPE_ERROR",
+                "IF condition must be BOOLEAN",
+                node=node
+            )
+    
+        # ✅ Expression IF
+        if node.is_expression:
+            if condition.value:
+                result = self.evaluate(node.then_branch)
+            else:
+                result = self.evaluate(node.else_branch)
+    
+            return result
+    
+        # ✅ Block IF
+        if condition.value:
+            result = None
+            for stmt in node.then_branch:
+                result = self.evaluate(stmt)
+            return result
+    
+        if node.else_branch is not None:
+            result = None
+            for stmt in node.else_branch:
+                result = self.evaluate(stmt)
+            return result
+    
+        return None
+
+    def _eval_binary(self, node):
+        left = self.evaluate(node.left)
+        right = self.evaluate(node.right)
+
+        # ✅ unwrap plugin objects
+        if isinstance(left, PluginObject):
+            left = left.obj
+
+        if isinstance(right, PluginObject):
+            right = right.obj
+
+        debug("BINOP LEFT", left)
+        debug("BINOP RIGHT", right)
+        debug("BINOP OP", node.op)
+
+        # ✅ get class
+        cls = left.__class__
+
+        # ✅ build cache only once
+        if cls not in self._operator_cache:
+            self._build_cache(cls)
+
+        operator_map = self._operator_cache[cls]
+
+        if node.op in operator_map:
+            method = operator_map[node.op].__get__(left, cls)
+            py_right = self._to_python(right)
+            result = method(py_right)
+            return self._to_pydbml(result)
+
+        raise raise_error(
+            "OPERATOR_ERROR",
+            f"{node.op} not supported for {type(left).__name__}",
+            node=node
+        )
