@@ -246,7 +246,7 @@ class Parser:
 
         value = self.expression()
 
-        return AssignNode(name, value, is_global)
+        return AssignNode(name, value, is_global, token)
 
     # --------------------------
     # Expression (precedence)
@@ -283,7 +283,7 @@ class Parser:
             }
             op = op_map[op_token.type]
             right = self._parse_term()
-            node = BinaryOpNode(node, op, right)
+            node = BinaryOpNode(node, op, right, token=op_token)
 
         return node
 
@@ -291,9 +291,10 @@ class Parser:
         node = self._parse_factor()
 
         while self._match("PLUS", "MINUS"):
-            op = self._consume().value
+            op_token = self._consume()
+            op = op_token.value
             right = self._parse_factor()
-            node = BinaryOpNode(node, op, right)
+            node = BinaryOpNode(node, op, right, token=op_token)
 
         return node
 
@@ -362,18 +363,20 @@ class Parser:
         while True:
         
             if self._match("MUL", "DIV"):
-                op = self._consume().value
+                op_token = self._consume()
+                op = op_token.value
 
             else:
                 token = self._peek()
 
                 if token and token.type.startswith("OP_"):
-                    op = self._consume().value
+                    op_token = self._consume()
+                    op = op_token.value
                 else:
                     break
                 
             right = self._parse_primary()
-            node = BinaryOpNode(node, op, right)
+            node = BinaryOpNode(node, op, right, token=op_token)
 
         return node
 
@@ -402,13 +405,13 @@ class Parser:
         # Number
         # --------------------------
         if token.type == "NUMBER":
-            return NumberNode(float(token.value))
+            return NumberNode(float(token.value), token)
 
         # --------------------------
         # String
         # --------------------------
         if token.type == "STRING":
-            return StringNode(token.value.strip("'"))
+            return StringNode(token.value.strip("'"), token)
     
         # --------------------------
         # Object creation (UPDATED ✅)
@@ -456,7 +459,7 @@ class Parser:
                 # ✅ IMPORTANT: use dedicated node
                 return FunctionCallNode(name, args)
 
-            node = VariableNode(name, is_global)
+            node = VariableNode(name, is_global, token=token)
             return node
     
         if token.type == "LPAREN":
@@ -465,7 +468,7 @@ class Parser:
             return node
         
         if token.type == "IDENTIFIER":
-            node = VariableNode(token.value, is_global=False)
+            node = VariableNode(token.value, is_global=False, token=token)
             return node
         
         raise SyntaxError(f"Unexpected token: {token.type}")
@@ -626,7 +629,7 @@ class Parser:
         is_global = token.type == "GLOBAL_VAR"
         name = token.value.replace("!", "")
 
-        target = VariableNode(name, is_global)
+        target = VariableNode(name, is_global, token=token)
 
         # parse index
         self._consume_expected("LBRACKET")

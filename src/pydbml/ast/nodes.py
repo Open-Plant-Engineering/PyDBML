@@ -1,4 +1,7 @@
 class ASTNode:
+    def __init__(self, token=None):
+        self.token = token
+
     def __repr__(self):
         return self.__class__.__name__ + str(self.__dict__)
 
@@ -6,11 +9,13 @@ class ASTNode:
 # Literals
 # --------------------------
 class NumberNode(ASTNode):
-    def __init__(self, value):
+    def __init__(self, value, token=None):
+        super().__init__(token)
         self.value = value
 
 class StringNode(ASTNode):
-    def __init__(self, value):
+    def __init__(self, value, token=None):
+        super().__init__(token)
         self.value = value
 
 class BooleanNode(ASTNode):
@@ -21,7 +26,8 @@ class BooleanNode(ASTNode):
 # Variables
 # --------------------------
 class VariableNode(ASTNode):
-    def __init__(self, name, is_global=False):
+    def __init__(self, name, is_global=False,  token=None):
+        super().__init__(token)
         self.name = name
         self.is_global = is_global
 
@@ -29,7 +35,8 @@ class VariableNode(ASTNode):
 # Assignment
 # --------------------------
 class AssignNode(ASTNode):
-    def __init__(self, name, value, is_global=False):
+    def __init__(self, name, value, is_global=False, token=None):
+        super().__init__(token)
         self.name = name
         self.value = value
         self.is_global = is_global
@@ -38,7 +45,8 @@ class AssignNode(ASTNode):
 # Binary Operation
 # --------------------------
 class BinaryOpNode(ASTNode):
-    def __init__(self, left, op, right):
+    def __init__(self, left, op, right, token=None):
+        super().__init__(token)
         self.left = left
         self.op = op
         self.right = right

@@ -27,4 +27,4 @@ class PyDBMLType(ABC):
 
     @pydbml_method("OBJECTTYPE")
     def objecttype(self):
-        return self.__repr__()
+        return self.__class__.__name__.upper()
