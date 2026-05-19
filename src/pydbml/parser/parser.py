@@ -191,14 +191,10 @@ class Parser:
         if self._match("RETURN"):
             return self._attach_handle(self._parse_return())
 
-        # ✅ assignment detection (variable, index, dot)
-        if token and token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
-        
-            save_pos = self.pos
-
+        # ✅ assignment detection via lookahead
+        if self._is_assignment():
             left = self._expr_bp()
-            
-            # ✅ assignment
+
             if self._match("EQUAL"):
                 self._consume()
                 value = self.expression()
@@ -213,9 +209,6 @@ class Parser:
                     return self._attach_handle(DotAssignNode(left.target, left.attribute, value))
 
                 raise SyntaxError("Invalid assignment target")
-
-            # ✅ rollback if not assignment
-            self.pos = save_pos
 
         stmt = self.expression()
         return self._attach_handle(stmt)
@@ -908,3 +901,20 @@ class Parser:
             return token.value
 
         return op
+
+    def _is_assignment(self):
+        pos = self.pos
+
+        while pos < len(self.tokens):
+            t = self.tokens[pos]
+
+            if t.type == "EQUAL":
+                return True
+
+            # stop if statement boundary hit (optional safeguard)
+            if t.type in ("THEN", "ENDIF", "ELSE", "ENDDO"):
+                return False
+
+            pos += 1
+
+        return False
