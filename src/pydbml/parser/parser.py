@@ -30,7 +30,6 @@ from pydbml.ast.nodes import (
     LogicalOpNode,
     NotNode,
 )
-from pydbml.utils.debug import debug
 
 class Parser:
 
@@ -45,7 +44,7 @@ class Parser:
         parse()        → entry point
         statement()    → handles top-level statements
         expression()   → Pratt parser entry
-        _expr_bp()     → precedence-based parsing
+        _parse_expression_bp()     → precedence-based parsing
         _parse_postfix() → handles chaining (dot, indexing)
 
     Design goals:
@@ -190,7 +189,7 @@ class Parser:
 
         # ✅ assignment detection via lookahead
         if self._is_assignment():
-            left = self._expr_bp()
+            left = self._parse_expression_bp()
 
             if self._match("EQUAL"):
                 self._consume()
@@ -217,7 +216,7 @@ class Parser:
         if self._match("IF"):
             return self._parse_if()
 
-        return self._expr_bp()
+        return self._parse_expression_bp()
 
     def _parse_primary(self):
         token = self._consume()
@@ -269,11 +268,11 @@ class Parser:
         
             # ✅ parse arguments
             if not self._match("RPAREN"):
-                args.append(self._expr_bp())
+                args.append(self._parse_expression_bp())
         
                 while self._match("COMMA"):
                     self._consume()
-                    args.append(self._expr_bp())
+                    args.append(self._parse_expression_bp())
         
             self._consume_expected("RPAREN")
         
@@ -287,11 +286,11 @@ class Parser:
                 self._consume()  # (
                 args = []
                 if not self._match("RPAREN"):
-                    args.append(self._expr_bp())
+                    args.append(self._parse_expression_bp())
 
                     while self._match("COMMA"):
                         self._consume()
-                        args.append(self._expr_bp())
+                        args.append(self._parse_expression_bp())
 
                 self._consume_expected("RPAREN")
 
@@ -759,7 +758,7 @@ class Parser:
             return self._parse_handle(stmt)
         return stmt
 
-    def _expr_bp(self, min_bp=0):
+    def _parse_expression_bp(self, min_bp=0):
         """
         Pratt parser implementation.
 
@@ -777,11 +776,11 @@ class Parser:
         # ✅ parse left side
         if self._match("NOT"):
             op_token = self._consume()
-            operand = self._expr_bp(30)
+            operand = self._parse_expression_bp(30)
             left = NotNode(operand)
         elif self._match("MINUS"):
             op_token = self._consume()
-            operand = self._expr_bp(60)
+            operand = self._parse_expression_bp(60)
             left = BinaryOpNode(NumberNode(0), "-", operand)
         else:
             left = self._parse_primary()
@@ -806,7 +805,7 @@ class Parser:
             op = self._get_operator(op_token)
 
             # ✅ right side (higher precedence)
-            right = self._expr_bp(bp + 1)
+            right = self._parse_expression_bp(bp + 1)
             right = self._parse_postfix(right)
 
             # ✅ logical vs binary
@@ -825,7 +824,7 @@ class Parser:
             # --------------------------
             if self._match("LBRACKET"):
                 self._consume()
-                index = self._expr_bp()
+                index = self._parse_expression_bp()
                 self._consume_expected("RBRACKET")
                 node = IndexAccessNode(node, index, token=index.token)
                 continue
@@ -846,11 +845,11 @@ class Parser:
 
                     args = []
                     if not self._match("RPAREN"):
-                        args.append(self._expr_bp())
+                        args.append(self._parse_expression_bp())
 
                         while self._match("COMMA"):
                             self._consume()
-                            args.append(self._expr_bp())
+                            args.append(self._parse_expression_bp())
 
                     self._consume_expected("RPAREN")
 

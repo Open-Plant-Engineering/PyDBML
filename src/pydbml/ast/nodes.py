@@ -3,7 +3,8 @@ class ASTNode:
         self.token = token
 
     def __repr__(self):
-        return self.__class__.__name__ + str(self.__dict__)
+        fields = ", ".join(f"{k}={v!r}" for k, v in self.__dict__.items() if k != "token")
+        return f"{self.__class__.__name__}({fields})"
 
 # --------------------------
 # Literals
@@ -46,6 +47,18 @@ class AssignNode(ASTNode):
 # Binary Operation
 # --------------------------
 class BinaryOpNode(ASTNode):
+    """
+    Represents a binary operation.
+
+    Example:
+        a + b
+        x * y
+
+    Fields:
+        left   → left AST node
+        op     → operator string ('+', '-', etc.)
+        right  → right AST node
+    """
     def __init__(self, left, op, right, token=None):
         super().__init__(token)
         self.left = left
@@ -56,6 +69,18 @@ class BinaryOpNode(ASTNode):
 # IF Expression
 # --------------------------
 class IfNode(ASTNode):
+    """
+    Represents both expression and block IF.
+
+    Modes:
+        is_expression = True:
+            IF cond THEN a ELSE b
+
+        is_expression = False:
+            IF cond THEN
+                ...
+            ENDIF
+    """
     def __init__(self, condition, then_branch, else_branch=None, is_expression=False, token=None):
         super().__init__(token)
         self.condition = condition
@@ -104,7 +129,7 @@ class ObjectNode(ASTNode):
     def __init__(self, type_name, args=None, token=None):
         super().__init__(token)
         self.type_name = type_name
-        self.args = args or []
+        self.args = list(args) if args else []
 
 # --------------------------
 # Dot Access
@@ -177,6 +202,15 @@ class PipeStringNode(ASTNode):
         self.raw = raw
 
 class DoNode(ASTNode):
+    """
+    Represents loop constructs.
+
+    Modes:
+        indices loop
+        values loop
+        range loop
+        infinite loop
+    """
     def __init__(self, var=None, mode=None, iterable=None,
                  start=None, end=None, step=None, body=None, token=None):
         super().__init__(token)
@@ -191,7 +225,8 @@ class DoNode(ASTNode):
         self.body = body or []
 
 class BreakNode(ASTNode):
-    pass
+    def __init__(self, token=None):
+        super().__init__(token)
 
 class BreakIfNode(ASTNode):
     def __init__(self, condition, token=None):
@@ -214,12 +249,6 @@ class HandleNode(ASTNode):
         self.try_block = try_block              # list of statements
         self.handlers = handlers or []          # list of (condition, block)
         self.else_block = else_block            # success case
-
-class HandleCase(ASTNode):
-    def __init__(self, condition, block, token=None):
-        super().__init__(token)
-        self.condition = condition  # tuple OR 'ANY'
-        self.block = block
 
 class LabelNode(ASTNode):
     def __init__(self, name, token=None):
