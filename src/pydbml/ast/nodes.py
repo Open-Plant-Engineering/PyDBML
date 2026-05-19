@@ -19,7 +19,8 @@ class StringNode(ASTNode):
         self.value = value
 
 class BooleanNode(ASTNode):
-    def __init__(self, value):
+    def __init__(self, value, token=None):
+        super().__init__(token)
         self.value = value
 
 # --------------------------
@@ -54,8 +55,9 @@ class BinaryOpNode(ASTNode):
 # --------------------------
 # IF Expression
 # --------------------------
-class IfNode:
-    def __init__(self, condition, then_branch, else_branch=None, is_expression=False):
+class IfNode(ASTNode):
+    def __init__(self, condition, then_branch, else_branch=None, is_expression=False, token=None):
+        super().__init__(token)
         self.condition = condition
         self.then_branch = then_branch
         self.else_branch = else_branch
@@ -65,20 +67,23 @@ class IfNode:
 # Logical Operations
 # --------------------------
 class LogicalOpNode(ASTNode):
-    def __init__(self, left, op, right):
+    def __init__(self, left, op, right, token=None):
+        super().__init__(token)
         self.left = left
         self.op = op
         self.right = right
 
 class NotNode(ASTNode):
-    def __init__(self, operand):
+    def __init__(self, operand, token=None):
+        super().__init__(token)
         self.operand = operand
 
 # --------------------------
 # Array Access
 # --------------------------
 class IndexAccessNode(ASTNode):
-    def __init__(self, target, index):
+    def __init__(self, target, index, token=None):
+        super().__init__(token)
         self.target = target
         self.index = index
 
@@ -86,7 +91,8 @@ class IndexAccessNode(ASTNode):
 # Array Assignment
 # --------------------------
 class IndexAssignNode(ASTNode):
-    def __init__(self, target, index, value):
+    def __init__(self, target, index, value, token=None):
+        super().__init__(token)
         self.target = target
         self.index = index
         self.value = value
@@ -95,7 +101,8 @@ class IndexAssignNode(ASTNode):
 # Object Creation
 # --------------------------
 class ObjectNode(ASTNode):
-    def __init__(self, type_name, args=None):
+    def __init__(self, type_name, args=None, token=None):
+        super().__init__(token)
         self.type_name = type_name
         self.args = args or []
 
@@ -103,7 +110,8 @@ class ObjectNode(ASTNode):
 # Dot Access
 # --------------------------
 class DotAccessNode(ASTNode):
-    def __init__(self, target, attribute):
+    def __init__(self, target, attribute, token=None):
+        super().__init__(token)
         self.target = target
         self.attribute = attribute
 
@@ -111,57 +119,67 @@ class DotAccessNode(ASTNode):
 # Dot Assignment
 # --------------------------
 class DotAssignNode(ASTNode):
-    def __init__(self, target, attribute, value):
+    def __init__(self, target, attribute, value, token=None):
+        super().__init__(token)
         self.target = target
         self.attribute = attribute
         self.value = value
 
 class CallNode(ASTNode):
-    def __init__(self, target, method, args):
+    def __init__(self, target, method, args, token=None):
+        super().__init__(token)
         self.target = target
         self.method = method
         self.args = args
 
 class FunctionCallNode(ASTNode):
-    def __init__(self, name, args):
+    def __init__(self, name, args, token=None):
+        super().__init__(token)
         self.name = name
         self.args = args
 
 class FunctionDefNode(ASTNode):
-    def __init__(self, name, params, return_type, body):
+    def __init__(self, name, params, return_type, body, token=None):
+        super().__init__(token)
         self.name = name
         self.params = params          # list of (name, type)
         self.return_type = return_type
         self.body = body
 
 class ReturnNode(ASTNode):
-    def __init__(self, value):
+    def __init__(self, value, token=None):
+        super().__init__(token)
         self.value = value
 
 class ObjectDefNode(ASTNode):
-    def __init__(self, name, members, methods):
+    def __init__(self, name, members, methods, token=None):
+        super().__init__(token)
         self.name = name
         self.members = members    # dict {name: type}
         self.methods = methods    # dict {name: method AST}
 
 class MethodDefNode(ASTNode):
-    def __init__(self, name, body, params=None):
+    def __init__(self, name, body, params=None, token=None):
+        super().__init__(token)
         self.name = name
         self.body = body
         self.params = params or []
 
 class CommandVarNode(ASTNode):
-    def __init__(self, name, is_global=False):
+    def __init__(self, name, is_global=False, token=None):
+        super().__init__(token)
         self.name = name
         self.is_global = is_global
         
 class PipeStringNode(ASTNode):
-    def __init__(self, raw):
+    def __init__(self, raw, token=None):
+        super().__init__(token)
         self.raw = raw
 
-class DoNode:
+class DoNode(ASTNode):
     def __init__(self, var=None, mode=None, iterable=None,
-                 start=None, end=None, step=None, body=None):
+                 start=None, end=None, step=None, body=None, token=None):
+        super().__init__(token)
         self.var = var          # loop variable (string)
         self.mode = mode        # "indices", "values", or None
         self.iterable = iterable
@@ -172,36 +190,43 @@ class DoNode:
 
         self.body = body or []
 
-class BreakNode:
+class BreakNode(ASTNode):
     pass
 
-class BreakIfNode:
-    def __init__(self, condition):
+class BreakIfNode(ASTNode):
+    def __init__(self, condition, token=None):
+        super().__init__(token)
         self.condition = condition
 
-class SkipIfNode:
-    def __init__(self, condition):
+class SkipIfNode(ASTNode):
+    def __init__(self, condition, token=None):
+        super().__init__(token)
         self.condition = condition
 
-class ImportNode:
-    def __init__(self, path):
+class ImportNode(ASTNode):
+    def __init__(self, path, token=None):
+        super().__init__(token)
         self.path = path
 
 class HandleNode(ASTNode):
-    def __init__(self, try_block, handlers=None, else_block=None):
+    def __init__(self, try_block, handlers=None, else_block=None, token=None):
+        super().__init__(token)
         self.try_block = try_block              # list of statements
         self.handlers = handlers or []          # list of (condition, block)
         self.else_block = else_block            # success case
 
-class HandleCase:
-    def __init__(self, condition, block):
+class HandleCase(ASTNode):
+    def __init__(self, condition, block, token=None):
+        super().__init__(token)
         self.condition = condition  # tuple OR 'ANY'
         self.block = block
 
-class LabelNode:
-    def __init__(self, name):
+class LabelNode(ASTNode):
+    def __init__(self, name, token=None):
+        super().__init__(token)
         self.name = name
 
-class GoLabelNode:
-    def __init__(self, name):
+class GoLabelNode(ASTNode):
+    def __init__(self, name, token=None):
+        super().__init__(token)
         self.name = name

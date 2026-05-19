@@ -27,6 +27,7 @@ from pydbml.ast.nodes import (
     HandleNode,
     GoLabelNode,
     LabelNode,
+    LogicalOpNode,
 )
 from pydbml.utils.debug import debug
 
@@ -113,7 +114,7 @@ class Parser:
                 else:
                     condition = self.expression()
         
-                return self._attach_handle(SkipIfNode(condition))
+                return self._attach_handle(SkipIfNode(condition, token=condition.token))
         
             # ✅ standalone skip
             return self._attach_handle(SkipIfNode(None))
@@ -153,7 +154,7 @@ class Parser:
                 condition = self.expression()
         
             if not self._match("THEN"):
-                return self._attach_handle(SkipIfNode(condition))
+                return self._attach_handle(SkipIfNode(condition, token=condition.token))
         
             self.pos = pos_backup
 
@@ -318,7 +319,7 @@ class Parser:
                 self._consume()
                 index_expr = self.expression()
                 self._consume_expected("RBRACKET")
-                node = IndexAccessNode(node, index_expr)
+                node = IndexAccessNode(node, index_expr, token=index_expr.token)
                 continue
 
             # --------------------------
@@ -350,11 +351,11 @@ class Parser:
                             args.append(self.expression())
 
                     self._consume_expected("RPAREN")
-                    node = CallNode(node, method_name, args)
+                    node = CallNode(node, method_name, args, token=attr_token)
 
                 # ✅ attribute access
                 else:
-                    node = DotAccessNode(node, method_name)
+                    node = DotAccessNode(node, method_name, token=attr_token)
 
                 continue
 
@@ -438,7 +439,7 @@ class Parser:
         
             self._consume_expected("RPAREN")
         
-            return ObjectNode(type_name, args)
+            return ObjectNode(type_name, args, token=token)
 
         if token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             is_global = token.type == "GLOBAL_VAR"
@@ -457,7 +458,7 @@ class Parser:
                 self._consume_expected("RPAREN")
 
                 # ✅ IMPORTANT: use dedicated node
-                return FunctionCallNode(name, args)
+                return FunctionCallNode(name, args, token=token)
 
             node = VariableNode(name, is_global, token=token)
             return node
@@ -534,7 +535,7 @@ class Parser:
             self._consume_expected("ELSE")
             else_expr = self.expression()
         
-            return IfNode(condition, then_expr, else_expr, is_expression=True)
+            return IfNode(condition, then_expr, else_expr, is_expression=True, token=condition.token)
         
         except Exception:
             # rollback and parse as block IF
@@ -566,10 +567,9 @@ class Parser:
         node = self._parse_and()
 
         while self._match("OR"):
-            self._consume()
+            op_token = self._consume()
             right = self._parse_and()
-            from pydbml.ast.nodes import LogicalOpNode
-            node = LogicalOpNode(node, "OR", right)
+            node = LogicalOpNode(node, "OR", right, token=op_token)
 
         return node
 
@@ -577,10 +577,10 @@ class Parser:
         node = self._parse_not()
 
         while self._match("AND"):
-            self._consume()
+            op_token = self._consume()
             right = self._parse_not()
             from pydbml.ast.nodes import LogicalOpNode
-            node = LogicalOpNode(node, "AND", right)
+            node = LogicalOpNode(node, "AND", right, token=op_token)
 
         return node
 
@@ -642,7 +642,7 @@ class Parser:
         # parse value
         value = self.expression()
 
-        return IndexAssignNode(target, index_expr, value)
+        return IndexAssignNode(target, index_expr, value, token=token)
     
     def _is_dot_assignment(self):
         """
@@ -689,7 +689,7 @@ class Parser:
 
         value = self.expression()
 
-        return DotAssignNode(target.target, target.attribute, value)
+        return DotAssignNode(target.target, target.attribute, value, token=target.token)
     
     def _parse_function_def(self):
         self._consume_expected("DEFINE")
@@ -758,7 +758,7 @@ class Parser:
     def _parse_return(self):
         self._consume_expected("RETURN")
         value = self.expression()
-        return ReturnNode(value)
+        return ReturnNode(value, token=value.token)
     
     def _parse_object_def(self):
         self._consume_expected("DEFINE")
