@@ -56,6 +56,7 @@ class ASTEvaluator:
         self.debug_mode = False
         self.step_mode = False
         self.breakpoints = set()
+        self._debug_vars = set()
 
     def evaluate(self, node):
         try:
@@ -874,6 +875,9 @@ class ASTEvaluator:
 
                 self.env.set(node.name, value, node.is_global)
 
+                # ✅ TRACK VARIABLE FOR DEBUGGER
+                self._debug_vars.add(node.name)
+
                 return f"{node.name} set"
 
             # --------------------------
@@ -1172,25 +1176,49 @@ class ASTEvaluator:
 
             elif cmd.startswith("p"):
                 parts = cmd.split()
-
+            
                 # ✅ print all variables
                 if len(parts) == 1:
                     print("Variables:")
-                    for scope in reversed(self.env.scopes):
+            
+                    # ✅ local scopes (inner → outer)
+                    for scope in reversed(self.env._local_stack):
                         for name, var in scope.items():
                             try:
                                 val = var.get()
                             except Exception:
                                 val = var
                             print(f"  {name} = {val}")
+            
+                    # ✅ global variables
+                    for name, var in self.env._global.items():
+                        try:
+                            val = var.get()
+                        except Exception:
+                            val = var
+                        print(f"  {name} (global) = {val}")
+            
                     continue
                 
                 # ✅ print specific variable
-                var_name = parts[1]
-                try:
-                    val = self.env.get(var_name).get()
-                    print(f"{var_name} = {val}")
-                except Exception:
+                var_name = parts[1].lower()
+            
+                # ✅ check local first
+                found = False
+                for scope in reversed(self.env._local_stack):
+                    if var_name in scope:
+                        val = scope[var_name].get()
+                        print(f"{var_name} = {val}")
+                        found = True
+                        break
+                    
+                # ✅ fallback global
+                if not found and var_name in self.env._global:
+                    val = self.env._global[var_name].get()
+                    print(f"{var_name} (global) = {val}")
+                    found = True
+            
+                if not found:
                     print(f"{var_name} not found")
 
             elif cmd in ("q", "quit"):
