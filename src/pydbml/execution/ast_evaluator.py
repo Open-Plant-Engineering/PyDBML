@@ -135,107 +135,7 @@ class ASTEvaluator:
                 return result
 
             if isinstance(node, DoNode):
-
-                # --------------------------
-                # ✅ 1. INDICES LOOP
-                # --------------------------
-                if node.mode == "indices":
-                    iter_value = self.evaluate(node.iterable)
-
-                    # unwrap variable if needed
-                    if isinstance(iter_value, Variable):
-                        iter_value = iter_value.get()
-
-                    array_obj = iter_value
-
-                    for key in sorted(array_obj.value.keys()):
-
-                        # ✅ loop variable = actual index
-                        self.env.set(node.var, Real(key), False)
-
-                        try:
-                            for stmt in node.body:
-                                self.evaluate(stmt)
-                        except ContinueSignal:
-                            continue
-                        except BreakSignal:
-                            break
-                        
-                    return None
-
-                # --------------------------
-                # ✅ 2. VALUES LOOP
-                # --------------------------
-                if node.mode == "values":
-                    iter_value = self.evaluate(node.iterable)
-
-                    # unwrap variable if needed
-                    if isinstance(iter_value, Variable):
-                        iter_value = iter_value.get()
-
-                    array_obj = iter_value
-
-                    for val in array_obj.value.values():
-
-                        # ✅ loop variable = value
-                        self.env.set(node.var, val, False)
-
-                        try:
-                            for stmt in node.body:
-                                self.evaluate(stmt)
-                        except ContinueSignal:
-                            continue
-                        except BreakSignal:
-                            break
-                        
-                    return None
-
-                # --------------------------
-                # ✅ 3. RANGE LOOP
-                # --------------------------
-                if node.start is not None:
-                
-                    start_val = self.evaluate(node.start).value
-                    end_val = self.evaluate(node.end).value
-                    step_val = self.evaluate(node.step).value if node.step else 1
-
-                    i = start_val
-
-                    while True:
-                    
-                        if step_val > 0 and i > end_val:
-                            break
-                        if step_val < 0 and i < end_val:
-                            break
-
-                        self.env.set(node.var, Real(i), False)
-
-                        try:
-                            for stmt in node.body:
-                                self.evaluate(stmt)
-                        except ContinueSignal:
-                            i += step_val
-                            continue
-                        except BreakSignal:
-                            break
-                        
-                        i += step_val
-
-                    return None
-
-                # --------------------------
-                # ✅ 4. INFINITE LOOP
-                # --------------------------
-                while True:
-                    try:
-                        for stmt in node.body:
-                            self.evaluate(stmt)
-                    except ContinueSignal:
-                        continue
-                    except BreakSignal:
-                        break
-                    
-                return None
+                return self._eval_do(node)
 
             if isinstance(node, BreakIfNode):
                 condition = self.evaluate(node.condition)
@@ -343,84 +243,20 @@ class ASTEvaluator:
                 # --------------------------
                 if hasattr(self, "object_defs") and type_name in self.object_defs:
                     obj_def = self.object_defs[type_name]
-
                     instance = ObjectInstance(obj_def)
-
-                    constructor_name = type_name
                     args = [self.evaluate(arg) for arg in node.args]
-
-                    if constructor_name in obj_def.methods:
-                    
-                        methods = obj_def.methods[constructor_name]
-
-                        if not isinstance(methods, list):
-                            methods = [methods]
-
-                        selected = None
-
-                        for m in methods:
-                            if len(m.params) == len(args):
-                                selected = m
-                                break
-                            
-                        if selected is None:
-                            raise raise_error(
-                                "CONSTRUCTOR_ERROR",
-                                f"{constructor_name} with {len(args)} args",
-                                node=node
-                            )
-
-                        self._execute_method(instance, selected, args)
-
-                    elif len(args) > 0:
-                        raise raise_error(
-                            "CONSTRUCTOR_ERROR",
-                            f"{node.type_name} does not accept arguments",
-                            node=node
-                        )
-
+                    self._construct_object(instance, obj_def, type_name, args, node)
                     return instance
 
                 # --------------------------
                 # ✅ 4. Existing file loader (unchanged)
                 # --------------------------
                 if type_name != "object":
-                
                     loader = ObjectLoader(self.resolver)
                     obj_def = loader.load(type_name)
-
                     instance = ObjectInstance(obj_def)
-
-                    constructor_name = type_name
                     args = [self.evaluate(arg) for arg in node.args]
-
-                    if constructor_name in obj_def.methods:
-                    
-                        methods = obj_def.methods[constructor_name]
-
-                        selected = None
-
-                        for m in methods:
-                            if len(m.params) == len(args):
-                                selected = m
-                                break
-                            
-                        if selected is None:
-                            raise raise_error(
-                                "CONSTRUCTOR_ERROR",
-                                f"{constructor_name} with {len(args)} args",
-                                node=node
-                            )
-
-                        self._execute_method(instance, selected, args)
-
-                    elif len(args) > 0:
-                        raise raise_error(
-                            "CONSTRUCTOR_ERROR",
-                            f"{node.type_name} does not accept arguments",
-                            node=node
-                        )
-
+                    self._construct_object(instance, obj_def, type_name, args, node)
                     return instance
 
             if isinstance(node, ReturnNode):
@@ -608,8 +444,8 @@ class ASTEvaluator:
                 # --------------------------
                 cls = target.__class__
                 
-                # build cache once
-                self._build_cache(cls)
+                if cls not in self._method_cache:
+                    self._build_cache(cls)
                 
                 method_map = self._method_cache[cls]
                 method_name_upper = method_name.upper()
@@ -935,7 +771,8 @@ class ASTEvaluator:
                 # =====================================================
                 cls = left.__class__
 
-                self._build_cache(cls)
+                if cls not in self._method_cache:
+                    self._build_cache(cls)
 
                 operator_map = self._operator_cache[cls]
 
@@ -1230,3 +1067,138 @@ class ASTEvaluator:
 
     def add_breakpoint(self, line):
         self.breakpoints.add(line)
+
+
+    def _eval_do(self, node):
+        # --------------------------
+        # ✅ 1. INDICES LOOP
+        # --------------------------
+        if node.mode == "indices":
+            iter_value = self.evaluate(node.iterable)
+
+            # unwrap variable if needed
+            if isinstance(iter_value, Variable):
+                iter_value = iter_value.get()
+
+            array_obj = iter_value
+
+            for key in sorted(array_obj.value.keys()):
+
+                # ✅ loop variable = actual index
+                self.env.set(node.var, Real(key), False)
+
+                try:
+                    for stmt in node.body:
+                        self.evaluate(stmt)
+                except ContinueSignal:
+                    continue
+                except BreakSignal:
+                    break
+                
+            return None
+
+        # --------------------------
+        # ✅ 2. VALUES LOOP
+        # --------------------------
+        if node.mode == "values":
+            iter_value = self.evaluate(node.iterable)
+
+            # unwrap variable if needed
+            if isinstance(iter_value, Variable):
+                iter_value = iter_value.get()
+
+            array_obj = iter_value
+
+            for val in array_obj.value.values():
+
+                # ✅ loop variable = value
+                self.env.set(node.var, val, False)
+
+                try:
+                    for stmt in node.body:
+                        self.evaluate(stmt)
+                except ContinueSignal:
+                    continue
+                except BreakSignal:
+                    break
+                
+            return None
+
+        # --------------------------
+        # ✅ 3. RANGE LOOP
+        # --------------------------
+        if node.start is not None:
+        
+            start_val = self.evaluate(node.start).value
+            end_val = self.evaluate(node.end).value
+            step_val = self.evaluate(node.step).value if node.step else 1
+
+            i = start_val
+
+            while True:
+            
+                if step_val > 0 and i > end_val:
+                    break
+                if step_val < 0 and i < end_val:
+                    break
+
+                self.env.set(node.var, Real(i), False)
+
+                try:
+                    for stmt in node.body:
+                        self.evaluate(stmt)
+                except ContinueSignal:
+                    i += step_val
+                    continue
+                except BreakSignal:
+                    break
+                
+                i += step_val
+
+            return None
+
+        # --------------------------
+        # ✅ 4. INFINITE LOOP
+        # --------------------------
+        while True:
+            try:
+                for stmt in node.body:
+                    self.evaluate(stmt)
+            except ContinueSignal:
+                continue
+            except BreakSignal:
+                break
+            
+        return None
+
+    def _construct_object(self, instance, obj_def, type_name, args, node):
+        constructor_name = type_name
+
+        if constructor_name in obj_def.methods:
+            methods = obj_def.methods[constructor_name]
+
+            if not isinstance(methods, list):
+                methods = [methods]
+
+            selected = None
+
+            for m in methods:
+                if len(m.params) == len(args):
+                    selected = m
+                    break
+
+            if selected is None:
+                raise raise_error(
+                    "CONSTRUCTOR_ERROR",
+                    f"{constructor_name} with {len(args)} args",
+                    node=node
+                )
+
+            self._execute_method(instance, selected, args)
+
+        elif len(args) > 0:
+            raise raise_error(
+                "CONSTRUCTOR_ERROR",
+                f"{type_name} does not accept arguments",
+                node=node
+            )
