@@ -39,6 +39,9 @@ from pydbml.ast.nodes import (
     BinaryOpNode,
     NumberNode,
     VariableNode,
+    StringNode,
+    BooleanNode,
+    AssignNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.utils.debug import debug
@@ -864,7 +867,7 @@ class ASTEvaluator:
             # --------------------------
             # Assignment
             # --------------------------
-            if node.__class__.__name__ == "AssignNode":
+            if isinstance(node, AssignNode):
                 value = self.evaluate(node.value)
 
                 debug("ASSIGN", f"{node.name} = {value}")
@@ -885,13 +888,13 @@ class ASTEvaluator:
             # --------------------------
             # String
             # --------------------------
-            if node.__class__.__name__ == "StringNode":
+            if isinstance(node, StringNode):
                 return String(node.value)
 
             # --------------------------
             # Boolean
             # --------------------------
-            if node.__class__.__name__ == "BooleanNode":
+            if isinstance(node, BooleanNode):
                 return Boolean(node.value)
 
             # --------------------------
