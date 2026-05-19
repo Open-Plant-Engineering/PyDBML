@@ -1,4 +1,6 @@
 from pydbml.core.engine import Engine
+import pytest
+from pydbml.runtime.exceptions import PyDBMLError
 
 def test_valid_member_type(tmp_path):
     lib = tmp_path / "pdlib"
@@ -37,11 +39,12 @@ endobject
 
     engine.execute("!u = object USER()")
 
-    try:
+    with pytest.raises(PyDBMLError) as exc:
         engine.execute("!u.age = 'wrong'")
-        assert False
-    except TypeError:
-        assert True
+
+    assert exc.value.code1 == 10
+    assert exc.value.code2 == 1
+
 
 def test_unknown_member(tmp_path):
     lib = tmp_path / "pdlib"
@@ -60,9 +63,8 @@ endobject
 
     engine.execute("!u = object USER()")
 
-    try:
+    with pytest.raises(PyDBMLError) as exc:
         engine.execute("!u.name = 'Tom'")
-        assert False
-    except KeyError:
-        assert True
 
+    assert exc.value.code1 == 20
+    assert exc.value.code2 == 1

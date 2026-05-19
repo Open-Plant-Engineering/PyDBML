@@ -361,15 +361,19 @@ class ASTEvaluator:
                                 break
                             
                         if selected is None:
-                            raise Exception(
-                                f"No matching constructor '{constructor_name}' for {len(args)} arguments"
+                            raise raise_error(
+                                "CONSTRUCTOR_ERROR",
+                                f"{constructor_name} with {len(args)} args",
+                                node=node
                             )
 
                         self._execute_method(instance, selected, args)
 
                     elif len(args) > 0:
-                        raise Exception(
-                            f"No constructor defined for '{node.type_name}' but arguments provided"
+                        raise raise_error(
+                            "CONSTRUCTOR_ERROR",
+                            f"{node.type_name} does not accept arguments",
+                            node=node
                         )
 
                     return instance
@@ -399,15 +403,19 @@ class ASTEvaluator:
                                 break
                             
                         if selected is None:
-                            raise Exception(
-                                f"No matching constructor '{constructor_name}' for {len(args)} arguments"
+                            raise raise_error(
+                                "CONSTRUCTOR_ERROR",
+                                f"{constructor_name} with {len(args)} args",
+                                node=node
                             )
 
                         self._execute_method(instance, selected, args)
 
                     elif len(args) > 0:
-                        raise Exception(
-                            f"No constructor defined for '{node.type_name}' but arguments provided"
+                        raise raise_error(
+                            "CONSTRUCTOR_ERROR",
+                            f"{node.type_name} does not accept arguments",
+                            node=node
                         )
 
                     return instance
@@ -663,7 +671,11 @@ class ASTEvaluator:
                     if node.attribute in obj.definition.methods:
                         return ("__method__", obj, node.attribute)
 
-                    raise KeyError(f"Attribute '{node.attribute}' not found")
+                    raise raise_error(
+                        "ATTRIBUTE_ERROR",
+                        f"{node.attribute} not found",
+                        node=node
+                    )
 
                 # --------------------------
                 # ✅ Array supports dot access (IMPORTANT FIX)
@@ -672,7 +684,11 @@ class ASTEvaluator:
                     if node.attribute in obj.value:
                         return self._to_pydbml(obj.value[node.attribute])
 
-                raise TypeError("Dot access not supported for this type")
+                raise raise_error(
+                    "TYPE_ERROR",
+                    "Dot access not supported for this type",
+                    node=node
+                )
 
             # --------------------------
             # DOT ASSIGN
@@ -687,14 +703,20 @@ class ASTEvaluator:
                 if isinstance(obj, ObjectInstance):
                     # ✅ attribute must exist
                     if node.attribute not in obj.definition.members:
-                        raise KeyError(f"Unknown member '{node.attribute}'")
+                        raise raise_error(
+                            "ATTRIBUTE_ERROR",
+                            f"{node.attribute}",
+                            node=node
+                        )
 
                     expected_type = obj.definition.members[node.attribute]
 
                     # ✅ allow None assignment (optional design choice)
                     if value is not None and not check_type(value, expected_type):
-                        raise TypeError(
-                            f"Member '{node.attribute}' expects {expected_type}"
+                        raise raise_error(
+                            "TYPE_ERROR",
+                            f"{node.attribute} expects {expected_type}",
+                            node=node
                         )
 
                     obj.value[node.attribute] = value
@@ -705,7 +727,11 @@ class ASTEvaluator:
                     obj.value[node.attribute] = value
                     return value
 
-                raise TypeError("Dot assignment not supported for this type")
+                raise raise_error(
+                    "TYPE_ERROR",
+                    "Dot assignment not supported",
+                    node=node
+                )
 
             # --------------------------
             # Index Assignment
@@ -723,7 +749,14 @@ class ASTEvaluator:
                 debug("VALUE TO SET", value)
 
                 # ✅ actual assignment
-                target_obj.set(int(index_val), value)
+                try:
+                    target_obj.set(int(index_val), value)
+                except Exception:
+                    raise raise_error(
+                        "INDEX_ERROR",
+                        f"Invalid index {index_val}",
+                        node=node
+                    )
 
                 return value
 
@@ -732,12 +765,27 @@ class ASTEvaluator:
             # --------------------------
             if isinstance(node, IndexAccessNode):
                 array_obj = self.evaluate(node.target)
-                index = int(self.evaluate(node.index).value)
+
+                index_val = self.evaluate(node.index)
+                if not isinstance(index_val, Real):
+                    raise raise_error(
+                        "INDEX_ERROR",
+                        "Index must be numeric",
+                        node=node
+                    )
+                index = int(index_val.value)
 
                 if isinstance(array_obj, list):
                     return self._to_pydbml(array_obj[index - 1])
 
-                return array_obj.get(index)
+                try:
+                    return array_obj.get(index)
+                except Exception:
+                    raise raise_error(
+                        "INDEX_ERROR",
+                        f"{index}",
+                        node=node
+                    )
 
             # --------------------------
             # NOT
