@@ -65,6 +65,7 @@ class ASTEvaluator:
         self._debug_vars = set()
         self._pipe_cache = {}
         self._attr_cache = {}
+        self.step_over_depth = None
 
     def evaluate(self, node):
         try:
@@ -578,8 +579,23 @@ class ASTEvaluator:
             line = None
             print(f"[STEP] → {node.__class__.__name__}")
 
-        # ✅ break condition
-        should_pause = self.step_mode or (line in self.breakpoints if line else False)
+        current_depth = len(self.call_stack)
+
+        should_pause = False
+
+        # ✅ step over logic
+        if self.step_over_depth is not None:
+            if current_depth <= self.step_over_depth:
+                should_pause = True
+                self.step_over_depth = None
+
+        # ✅ normal step
+        elif self.step_mode:
+            should_pause = True
+
+        # ✅ breakpoint logic (keep existing)
+        elif line and line in self.breakpoints:
+            should_pause = True        
 
         if not should_pause:
             return
@@ -654,7 +670,10 @@ class ASTEvaluator:
                         print(f"  Line {t.line}:{t.column} → {n.__class__.__name__}")
                     else:
                         print(f"  → {n.__class__.__name__}")
-                        
+            elif cmd in ("n", "next"):
+                self.step_over_depth = len(self.call_stack)
+                self.step_mode = True
+                return
             else:
                 print("Commands: c(continue), s(step), p var, q(quit)")
 
