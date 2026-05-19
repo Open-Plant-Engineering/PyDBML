@@ -63,6 +63,8 @@ class ASTEvaluator:
         self.step_mode = False
         self.breakpoints = set()
         self._debug_vars = set()
+        self._pipe_cache = {}
+        self._attr_cache = {}
 
     def evaluate(self, node):
         try:
@@ -147,68 +149,7 @@ class ASTEvaluator:
                 raise BreakSignal()
 
             if isinstance(node, PipeStringNode):
-                text = node.raw
-
-                # ✅ newline support
-                text = text.replace("$$", "\n")
-
-                def replace_expr(match):
-                    expr_group = match.group(1)   # $!(...)
-                    var_group = match.group(2)    # $!x or $!!x
-
-                    # --------------------------
-                    # ✅ CASE 1: Expression
-                    # --------------------------
-                    if expr_group is not None:
-                        expr_code = expr_group.strip()
-
-                        parser = Parser(expr_code)
-                        ast = parser.parse()
-
-                        result = self.evaluate(ast)
-
-                        val = result.value if hasattr(result, "value") else result
-
-                        if isinstance(val, float) and val.is_integer():
-                            val = int(val)
-
-                        return str(val)
-
-                    # --------------------------
-                    # ✅ CASE 2: Variable
-                    # --------------------------
-                    expr = var_group
-
-                    is_global = expr.startswith("!")
-                    expr = expr.lstrip("!")
-
-                    parts = expr.split(".")
-
-                    if is_global:
-                        value = self.env.get_global(parts[0]).get()
-                    else:
-                        value = self.env.get(parts[0]).get()
-
-                    for attr in parts[1:]:
-                        if isinstance(value, ObjectInstance):
-                            value = value.value[attr]
-                        else:
-                            value = value.get(attr)
-
-                    val = value.value if hasattr(value, "value") else value
-
-                    if isinstance(val, float) and val.is_integer():
-                        val = int(val)
-
-                    return str(val)
-
-                text = re.sub(
-                    r"\$\!\((.*?)\)|\$\!(\!?[a-zA-Z_][a-zA-Z0-9_.]*)",
-                    replace_expr,
-                    text
-                )
-
-                return String(text)
+                return self._eval_pipe_string(node)
 
             if isinstance(node, CommandVarNode):
                 if node.is_global:
@@ -307,322 +248,34 @@ class ASTEvaluator:
                 return None
 
             if isinstance(node, FunctionCallNode):
-
-                name = node.name.lower()
-
-                if name in self.registry.functions:
-                    func = self.registry.functions[name]
-
-                    # --------------------------
-                    # ✅ CASE 1: Python plugin function
-                    # --------------------------
-                    if callable(func):
-                        py_args = [self._to_python(self.evaluate(a)) for a in node.args]
-                        result = func(*py_args)
-                        return self._to_pydbml(result)
-
-                    # --------------------------
-                    # ✅ CASE 2: DSL function (FunctionDefNode)
-                    # --------------------------
-                    if isinstance(func, FunctionDefNode):
-                        func_ast = func
-                        # evaluate arguments
-                        arg_values = [self.evaluate(arg) for arg in node.args]
-                        if len(arg_values) != len(func_ast.params):
-                            raise raise_error(
-                                "ARG_COUNT",
-                                f"{name} expects {len(func_ast.params)} args, got {len(arg_values)}",
-                                node=node
-                            )
-
-                        self.env.push_scope()
-                        try:
-                            # bind parameters
-                            for (param_name, param_type), value in zip(func_ast.params, arg_values):
-                                self.env.set(param_name, value, is_global=False)
-
-                            result = None
-
-                            for stmt in func_ast.body:
-                                result = self.evaluate(stmt)
-
-                            return result
-
-                        except ReturnSignal as r:
-                            return r.value
-
-                        finally:
-                            self.env.pop_scope()
-
-                loader = FunctionLoader(self.resolver)
-                func_ast = loader.load(node.name)
-
-                # ✅ Validate function structure
-                if isinstance(func_ast, list):
-                    func_ast = func_ast[0]
-
-                if not isinstance(func_ast, FunctionDefNode):
-                    raise Exception(f"{node.name} is not a valid function")
-
-                # --------------------------
-                # Evaluate arguments
-                # --------------------------
-                arg_values = [self.evaluate(arg) for arg in node.args]
-
-                # --------------------------
-                # Argument count validation
-                # --------------------------
-                if len(arg_values) != len(func_ast.params):
-                    raise Exception(
-                        f"{node.name} expects {len(func_ast.params)} args, got {len(arg_values)}"
-                    )
-
-                # --------------------------
-                # Create new scope
-                # --------------------------
-                self.env.push_scope()
-
-                try:
-                    # bind params
-                    for (param_name, param_type), value in zip(func_ast.params, arg_values):
-                    
-                        if not check_type(value, param_type):
-                            raise TypeError(...)
-
-                        self.env.set(param_name, value, is_global=False)
-
-                    result = None
-
-                    for stmt in func_ast.body:
-                        result = self.evaluate(stmt)
-
-                    return result
-
-                except ReturnSignal as r:
-                
-                    if not check_type(r.value, func_ast.return_type):
-                        raise TypeError(...)
-
-                    return r.value
-
-                finally:
-                    # ✅ always restore scope
-                    self.env.pop_scope()
-
+                return self._eval_function_call(node)
 
             if isinstance(node, CallNode):
-
-                target = self.evaluate(node.target)
-                args = [self.evaluate(arg) for arg in node.args]
-                method_name = node.method.lower()
-
-                # --------------------------
-                # ✅ Case 1: Object method
-                # --------------------------
-                if isinstance(target, ObjectInstance):
-                
-                    # ✅ check object-defined methods FIRST
-                    if method_name in target.definition.methods:
-                    
-                        candidates = target.definition.methods[method_name]
-
-                        # ✅ normalize to list
-                        if not isinstance(candidates, list):
-                            candidates = [candidates]
-
-                        # ✅ select by argument count
-                        for method in candidates:
-                            if len(method.params) == len(args):
-                                return self._execute_method(target, method, args)
-
-                        raise Exception(
-                            f"No matching overload for {method_name} with {len(args)} args"
-                        )
-                    
-                # --------------------------
-                # ✅ FAST CACHE METHOD LOOKUP (NEW)
-                # --------------------------
-                cls = target.__class__
-                
-                if cls not in self._method_cache:
-                    self._build_cache(cls)
-                
-                method_map = self._method_cache[cls]
-                method_name_upper = method_name.upper()
-                
-                if method_name_upper in method_map:
-                    # ✅ bind method to instance
-                    method = method_map[method_name_upper].__get__(target, cls)
-                
-                    py_args = [self._to_python(a) for a in args]
-                
-                    result = method(*py_args)
-                
-                    return self._to_pydbml(result)
-
-                raise raise_error(
-                    "METHOD_NOT_FOUND",
-                    f"{method_name} for type '{type(target).__name__}'",
-                    node=node
-                )
+                return self._eval_method_call(node)
 
             # --------------------------
             # DOT ACCESS
             # --------------------------
             if isinstance(node, DotAccessNode):
-                obj = self.evaluate(node.target)
-
-                if isinstance(obj, PluginObject):
-                    obj = obj.obj
-
-                attr_name = node.attribute.lower()
-
-                # ✅ PLUGIN OBJECT SUPPORT (case-insensitive)
-                if not isinstance(obj, ObjectInstance):
-                    real_attr = None
-
-                    for attr in dir(obj):
-                        if attr.lower() == attr_name:
-                            real_attr = attr
-                            break
-                        
-                    if real_attr is not None:
-                        value = getattr(obj, real_attr)
-
-                        # ✅ methods allowed (checked later)
-                        if callable(value):
-                            return value
-
-                        # ✅ attributes allowed
-                        return self._to_pydbml(value)
-
-                # ✅ Other LOGIC
-                debug("DOT ACCESS", f"{obj}.{node.attribute}")
-
-                # ✅ ObjectInstance
-                if isinstance(obj, ObjectInstance):
-                
-                    if node.attribute in obj.value:
-                        return self._to_pydbml(obj.value[node.attribute])
-
-                    if node.attribute in obj.definition.methods:
-                        return ("__method__", obj, node.attribute)
-
-                    raise raise_error(
-                        "ATTRIBUTE_ERROR",
-                        f"{node.attribute} not found",
-                        node=node
-                    )
-
-                # --------------------------
-                # ✅ Array supports dot access (IMPORTANT FIX)
-                # --------------------------
-                if isinstance(obj, Array):
-                    if node.attribute in obj.value:
-                        return self._to_pydbml(obj.value[node.attribute])
-
-                raise raise_error(
-                    "TYPE_ERROR",
-                    "Dot access not supported for this type",
-                    node=node
-                )
+                return self._eval_dot_access(node)
 
             # --------------------------
             # DOT ASSIGN
             # --------------------------
             if isinstance(node, DotAssignNode):
-                obj = self.evaluate(node.target)
-                value = self.evaluate(node.value)
-
-                debug("DOT ASSIGN", f"{node.attribute} = {value}")
-
-                # ✅ ObjectInstance (typed enforcement)
-                if isinstance(obj, ObjectInstance):
-                    # ✅ attribute must exist
-                    if node.attribute not in obj.definition.members:
-                        raise raise_error(
-                            "ATTRIBUTE_ERROR",
-                            f"{node.attribute}",
-                            node=node
-                        )
-
-                    expected_type = obj.definition.members[node.attribute]
-
-                    # ✅ allow None assignment (optional design choice)
-                    if value is not None and not check_type(value, expected_type):
-                        raise raise_error(
-                            "TYPE_ERROR",
-                            f"{node.attribute} expects {expected_type}",
-                            node=node
-                        )
-
-                    obj.value[node.attribute] = value
-                    return value
-
-                # ✅ fallback (old behavior for arrays/dicts)
-                if hasattr(obj, "value") and isinstance(obj.value, dict):
-                    obj.value[node.attribute] = value
-                    return value
-
-                raise raise_error(
-                    "TYPE_ERROR",
-                    "Dot assignment not supported",
-                    node=node
-                )
+                return self._eval_dot_assign(node)
 
             # --------------------------
             # Index Assignment
             # --------------------------
             if isinstance(node, IndexAssignNode):
-                debug("INDEX ASSIGN NODE", node)
-
-                # ✅ evaluate target (this handles nested arrays properly)
-                target_obj = self.evaluate(node.target)
-
-                index_val = self.evaluate(node.index).value
-                value = self.evaluate(node.value)
-
-                debug("INDEX VALUE", index_val)
-                debug("VALUE TO SET", value)
-
-                # ✅ actual assignment
-                try:
-                    target_obj.set(int(index_val), value)
-                except Exception:
-                    raise raise_error(
-                        "INDEX_ERROR",
-                        f"Invalid index {index_val}",
-                        node=node
-                    )
-
-                return value
+                return self._eval_index_assign(node)
 
             # --------------------------
             # Index Access
             # --------------------------
             if isinstance(node, IndexAccessNode):
-                array_obj = self.evaluate(node.target)
-
-                index_val = self.evaluate(node.index)
-                if not isinstance(index_val, Real):
-                    raise raise_error(
-                        "INDEX_ERROR",
-                        "Index must be numeric",
-                        node=node
-                    )
-                index = int(index_val.value)
-
-                if isinstance(array_obj, list):
-                    return self._to_pydbml(array_obj[index - 1])
-
-                try:
-                    return array_obj.get(index)
-                except Exception:
-                    raise raise_error(
-                        "INDEX_ERROR",
-                        f"{index}",
-                        node=node
-                    )
+                return self._eval_index_access(node)
 
             # --------------------------
             # NOT
@@ -642,6 +295,13 @@ class ASTEvaluator:
             # --------------------------
             if isinstance(node, LogicalOpNode):
                 left = self.evaluate(node.left)
+                
+                if node.op == "AND" and not left.value:
+                    return Boolean(False)
+                
+                if node.op == "OR" and left.value:
+                    return Boolean(True)
+                
                 right = self.evaluate(node.right)
 
                 debug("LOGICAL LEFT", left)
@@ -1021,8 +681,9 @@ class ASTEvaluator:
                 self.env.set(node.var, Real(key), False)
 
                 try:
+                    eval_fn = self.evaluate
                     for stmt in node.body:
-                        self.evaluate(stmt)
+                        eval_fn(stmt)
                 except ContinueSignal:
                     continue
                 except BreakSignal:
@@ -1172,6 +833,13 @@ class ASTEvaluator:
 
     def _eval_binary(self, node):
         left = self.evaluate(node.left)
+        
+        if node.op == "AND" and not left.value:
+            return Boolean(False)
+
+        if node.op == "OR" and left.value:
+            return Boolean(True)
+
         right = self.evaluate(node.right)
 
         # ✅ unwrap plugin objects
@@ -1205,3 +873,353 @@ class ASTEvaluator:
             f"{node.op} not supported for {type(left).__name__}",
             node=node
         )
+
+    def _eval_function_call(self, node):
+        name = node.name.lower()
+
+        # --------------------------
+        # ✅ REGISTERED FUNCTIONS
+        # --------------------------
+        if name in self.registry.functions:
+            func = self.registry.functions[name]
+
+            # ✅ CASE 1: Python plugin function
+            if callable(func):
+                py_args = [self._to_python(self.evaluate(a)) for a in node.args]
+                result = func(*py_args)
+                return self._to_pydbml(result)
+
+            # ✅ CASE 2: DSL function
+            if isinstance(func, FunctionDefNode):
+                func_ast = func
+
+                arg_values = [self.evaluate(arg) for arg in node.args]
+
+                if len(arg_values) != len(func_ast.params):
+                    raise raise_error(
+                        "ARG_COUNT",
+                        f"{name} expects {len(func_ast.params)} args, got {len(arg_values)}",
+                        node=node
+                    )
+
+                self.env.push_scope()
+                try:
+                    # bind parameters
+                    for (param_name, param_type), value in zip(func_ast.params, arg_values):
+                        self.env.set(param_name, value, is_global=False)
+
+                    result = None
+                    for stmt in func_ast.body:
+                        result = self.evaluate(stmt)
+
+                    return result
+
+                except ReturnSignal as r:
+                    return r.value
+
+                finally:
+                    self.env.pop_scope()
+
+        # --------------------------
+        # ✅ FILE-LOADED FUNCTION
+        # --------------------------
+        loader = FunctionLoader(self.resolver)
+        func_ast = loader.load(node.name)
+
+        if isinstance(func_ast, list):
+            func_ast = func_ast[0]
+
+        if not isinstance(func_ast, FunctionDefNode):
+            raise Exception(f"{node.name} is not a valid function")
+
+        arg_values = [self.evaluate(arg) for arg in node.args]
+
+        if len(arg_values) != len(func_ast.params):
+            raise Exception(
+                f"{node.name} expects {len(func_ast.params)} args, got {len(arg_values)}"
+            )
+
+        self.env.push_scope()
+
+        try:
+            for (param_name, param_type), value in zip(func_ast.params, arg_values):
+                if not check_type(value, param_type):
+                    raise TypeError(...)
+
+                self.env.set(param_name, value, is_global=False)
+
+            result = None
+            for stmt in func_ast.body:
+                result = self.evaluate(stmt)
+
+            return result
+
+        except ReturnSignal as r:
+            if not check_type(r.value, func_ast.return_type):
+                raise TypeError(...)
+
+            return r.value
+
+        finally:
+            self.env.pop_scope()
+
+    def _eval_method_call(self, node):
+        target = self.evaluate(node.target)
+        args = [self.evaluate(arg) for arg in node.args]
+        method_name = node.method.lower()
+
+        # --------------------------
+        # ✅ Case 1: Object method (DSL object)
+        # --------------------------
+        if isinstance(target, ObjectInstance):
+
+            if method_name in target.definition.methods:
+
+                candidates = target.definition.methods[method_name]
+
+                if not isinstance(candidates, list):
+                    candidates = [candidates]
+
+                for method in candidates:
+                    if len(method.params) == len(args):
+                        return self._execute_method(target, method, args)
+
+                raise Exception(
+                    f"No matching overload for {method_name} with {len(args)} args"
+                )
+
+        # --------------------------
+        # ✅ Case 2: Plugin / Python methods
+        # --------------------------
+        cls = target.__class__
+
+        if cls not in self._method_cache:
+            self._build_cache(cls)
+
+        method_map = self._method_cache[cls]
+        method_name_upper = method_name.upper()
+
+        if method_name_upper in method_map:
+            method = method_map[method_name_upper].__get__(target, cls)
+
+            py_args = [self._to_python(a) for a in args]
+
+            result = method(*py_args)
+
+            return self._to_pydbml(result)
+
+        # --------------------------
+        # ❌ Not found
+        # --------------------------
+        raise raise_error(
+            "METHOD_NOT_FOUND",
+            f"{method_name} for type '{type(target).__name__}'",
+            node=node
+        )
+
+    def _eval_dot_access(self, node):
+        obj = self.evaluate(node.target)
+
+        if isinstance(obj, PluginObject):
+            obj = obj.obj
+
+        attr_name = node.attribute.lower()
+
+        # --------------------------
+        # ✅ Plugin object
+        # --------------------------
+        if not isinstance(obj, ObjectInstance):
+            real_attr = None
+
+            for attr in dir(obj):
+                if attr.lower() == attr_name:
+                    real_attr = attr
+                    break
+
+            if real_attr is not None:
+                value = getattr(obj, real_attr)
+
+                if callable(value):
+                    return value
+
+                return self._to_pydbml(value)
+
+        debug("DOT ACCESS", f"{obj}.{node.attribute}")
+
+        # --------------------------
+        # ✅ ObjectInstance
+        # --------------------------
+        if isinstance(obj, ObjectInstance):
+
+            if node.attribute in obj.value:
+                return self._to_pydbml(obj.value[node.attribute])
+
+            if node.attribute in obj.definition.methods:
+                return ("__method__", obj, node.attribute)
+
+            raise raise_error(
+                "ATTRIBUTE_ERROR",
+                f"{node.attribute} not found",
+                node=node
+            )
+
+        # --------------------------
+        # ✅ Array special case
+        # --------------------------
+        if isinstance(obj, Array):
+            if node.attribute in obj.value:
+                return self._to_pydbml(obj.value[node.attribute])
+
+        raise raise_error(
+            "TYPE_ERROR",
+            "Dot access not supported for this type",
+            node=node
+        )
+
+    def _eval_dot_assign(self, node):
+        obj = self.evaluate(node.target)
+        value = self.evaluate(node.value)
+
+        debug("DOT ASSIGN", f"{node.attribute} = {value}")
+
+        # --------------------------
+        # ✅ ObjectInstance (typed)
+        # --------------------------
+        if isinstance(obj, ObjectInstance):
+
+            if node.attribute not in obj.definition.members:
+                raise raise_error(
+                    "ATTRIBUTE_ERROR",
+                    f"{node.attribute}",
+                    node=node
+                )
+
+            expected_type = obj.definition.members[node.attribute]
+
+            if value is not None and not check_type(value, expected_type):
+                raise raise_error(
+                    "TYPE_ERROR",
+                    f"{node.attribute} expects {expected_type}",
+                    node=node
+                )
+
+            obj.value[node.attribute] = value
+            return value
+
+        # --------------------------
+        # ✅ fallback (dict-like)
+        # --------------------------
+        if hasattr(obj, "value") and isinstance(obj.value, dict):
+            obj.value[node.attribute] = value
+            return value
+
+        raise raise_error(
+            "TYPE_ERROR",
+            "Dot assignment not supported",
+            node=node
+        )
+
+    def _eval_index_access(self, node):
+        array_obj = self.evaluate(node.target)
+
+        index_val = self.evaluate(node.index)
+
+        if not isinstance(index_val, Real):
+            raise raise_error(
+                "INDEX_ERROR",
+                "Index must be numeric",
+                node=node
+            )
+
+        index = int(index_val.value)
+
+        # ✅ Python list fallback
+        if isinstance(array_obj, list):
+            return self._to_pydbml(array_obj[index - 1])
+
+        try:
+            return array_obj.get(index)
+        except Exception:
+            raise raise_error(
+                "INDEX_ERROR",
+                f"{index}",
+                node=node
+            )
+
+    def _eval_index_assign(self, node):
+        debug("INDEX ASSIGN NODE", node)
+
+        target_obj = self.evaluate(node.target)
+        index_val = self.evaluate(node.index).value
+        value = self.evaluate(node.value)
+
+        debug("INDEX VALUE", index_val)
+        debug("VALUE TO SET", value)
+
+        try:
+            target_obj.set(int(index_val), value)
+        except Exception:
+            raise raise_error(
+                "INDEX_ERROR",
+                f"Invalid index {index_val}",
+                node=node
+            )
+
+        return value
+
+    def _eval_pipe_string(self, node):
+        text = node.raw
+        text = text.replace("$$", "\n")
+
+        def replace_expr(match):
+            expr_group = match.group(1)
+            var_group = match.group(2)
+
+            if expr_group is not None:
+                expr_code = expr_group.strip()
+
+                if expr_code not in self._pipe_cache:
+                    parser = Parser(expr_code)
+                    self._pipe_cache[expr_code] = parser.parse()
+
+                ast = self._pipe_cache[expr_code]
+                result = self.evaluate(ast)
+
+                val = result.value if hasattr(result, "value") else result
+
+                if isinstance(val, float) and val.is_integer():
+                    val = int(val)
+
+                return str(val)
+
+            expr = var_group
+            is_global = expr.startswith("!")
+            expr = expr.lstrip("!")
+
+            parts = expr.split(".")
+
+            if is_global:
+                value = self.env.get_global(parts[0]).get()
+            else:
+                value = self.env.get(parts[0]).get()
+
+            for attr in parts[1:]:
+                if isinstance(value, ObjectInstance):
+                    value = value.value[attr]
+                else:
+                    value = value.get(attr)
+
+            val = value.value if hasattr(value, "value") else value
+
+            if isinstance(val, float) and val.is_integer():
+                val = int(val)
+
+            return str(val)
+
+        text = re.sub(
+            r"\$\!\((.*?)\)|\$\!(\!?[a-zA-Z_][a-zA-Z0-9_.]*)",
+            replace_expr,
+            text
+        )
+
+        return String(text)
