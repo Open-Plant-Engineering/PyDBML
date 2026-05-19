@@ -13,9 +13,20 @@ TYPE_MAP = {
 
 
 def check_type(value, expected_type):
-    expected_type = expected_type.upper()
+    # ✅ normalize once
+    if isinstance(expected_type, str):
+        expected_type = expected_type.upper()
+    else:
+        raise TypeError(f"Invalid type specifier: {expected_type}")
 
+    # ✅ unknown type
     if expected_type not in TYPE_MAP:
-        raise Exception(f"Unknown type: {expected_type}")
+        raise TypeError(f"Unknown type: {expected_type}")
 
-    return isinstance(value, TYPE_MAP[expected_type])
+    expected_cls = TYPE_MAP[expected_type]
+
+    # ✅ allow None (important for runtime)
+    if value is None:
+        return True
+
+    return isinstance(value, expected_cls)
