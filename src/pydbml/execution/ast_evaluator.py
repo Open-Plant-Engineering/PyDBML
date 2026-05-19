@@ -51,12 +51,15 @@ class ASTEvaluator:
         self.registry = PluginRegistry()
         self._method_cache = {}
         self._operator_cache = {}
-
+        self.call_stack = []
 
     def evaluate(self, node):
         try:
             if node is None:
                 return None
+            
+            self.call_stack.append(node)
+
             if isinstance(node, GoLabelNode):
                 raise GoLabelSignal(node.name)
             if isinstance(node, LabelNode):
@@ -887,6 +890,8 @@ class ASTEvaluator:
             
             # ✅ DSL error → keep
             if isinstance(e, PyDBMLError):
+                e.node = node if not e.node else e.node
+                e.stack = self.call_stack.copy()
                 raise
             
             # ✅ Python semantic/runtime errors → keep as-is
@@ -894,8 +899,12 @@ class ASTEvaluator:
                 raise
             
             # ✅ only unexpected/internal errors → wrap
-            raise PyDBMLError(99, 1, str(e))
-    
+            raise PyDBMLError(99, 1, str(e),  node=node, stack=self.call_stack.copy() )
+
+        finally:
+            if self.call_stack:
+                self.call_stack.pop()
+
     def _execute_method(self, instance, method_node, args):
 
         self.env.push_scope()
