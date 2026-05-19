@@ -33,6 +33,27 @@ from pydbml.ast.nodes import (
 from pydbml.utils.debug import debug
 
 class Parser:
+
+    """
+    Parser for PyDBML language.
+
+    This parser uses a Pratt parsing strategy for expressions,
+    allowing support for operator precedence, extensibility,
+    and complex expressions (dot access, indexing, method calls).
+
+    Structure:
+        parse()        → entry point
+        statement()    → handles top-level statements
+        expression()   → Pratt parser entry
+        _expr_bp()     → precedence-based parsing
+        _parse_postfix() → handles chaining (dot, indexing)
+
+    Design goals:
+        ✔ clean AST generation
+        ✔ no backtracking
+        ✔ extensibility for new language features
+    """
+
     def __init__(self, code: str):
         self.tokens = tokenize(code)
         self.pos = 0
@@ -121,12 +142,7 @@ class Parser:
             if self._match("IF"):
                 self._consume()
         
-                if self._match("LPAREN"):
-                    self._consume()
-                    condition = self.expression()
-                    self._consume_expected("RPAREN")
-                else:
-                    condition = self.expression()
+                condition = self._parse_optional_paren_expr()
         
                 return self._attach_handle(SkipIfNode(condition, token=condition.token))
         
@@ -143,12 +159,7 @@ class Parser:
             if self._match("IF"):
                 self._consume()
         
-                if self._match("LPAREN"):
-                    self._consume()
-                    condition = self.expression()
-                    self._consume_expected("RPAREN")
-                else:
-                    condition = self.expression()
+                condition = self._parse_optional_paren_expr()
         
                 return self._attach_handle(BreakIfNode(condition))
         
@@ -156,21 +167,7 @@ class Parser:
             return self._attach_handle(BreakNode())
         
         if self._match("IF"):
-            pos_backup = self.pos
-        
-            self._consume()
-        
-            if self._match("LPAREN"):
-                self._consume()
-                condition = self.expression()
-                self._consume_expected("RPAREN")
-            else:
-                condition = self.expression()
-        
-            if not self._match("THEN"):
-                return self._attach_handle(SkipIfNode(condition, token=condition.token))
-        
-            self.pos = pos_backup
+            return self._attach_handle(self._parse_if())
 
         if self._match("DO"):
             return self._attach_handle(self._parse_do())
@@ -212,21 +209,6 @@ class Parser:
 
         stmt = self.expression()
         return self._attach_handle(stmt)
-    
-    # --------------------------
-    # Assignment
-    # --------------------------
-    def assignment(self):
-        token = self._consume()
-
-        is_global = token.type == "GLOBAL_VAR"
-        name = token.value.replace("!", "")
-
-        self._consume_expected("EQUAL")
-
-        value = self.expression()
-
-        return AssignNode(name, value, is_global, token)
 
     # --------------------------
     # Expression (precedence)
@@ -299,7 +281,7 @@ class Parser:
 
         if token.type in ("LOCAL_VAR", "GLOBAL_VAR"):
             is_global = token.type == "GLOBAL_VAR"
-            name = token.value.replace("!", "").lower()
+            name = token.value.lstrip("!").lower()
 
             if token.type == "GLOBAL_VAR" and self._match("LPAREN"):
                 self._consume()  # (
@@ -353,7 +335,7 @@ class Parser:
 
     def _consume_expected(self, token_type):
         token = self._peek()
-        print("DEBUG consume_expected:", token_type, "got:", token)
+
         if token is None:
             raise SyntaxError(f"Expected {token_type}, but reached end of input")
         if token.type != token_type:
@@ -371,12 +353,7 @@ class Parser:
         # --------------------------
         # ✅ CONDITION (support both styles)
         # --------------------------
-        if self._match("LPAREN"):
-            self._consume()
-            condition = self.expression()
-            self._consume_expected("RPAREN")
-        else:
-            condition = self.expression()
+        condition = self._parse_optional_paren_expr()
 
         self._consume_expected("THEN")
 
@@ -783,6 +760,20 @@ class Parser:
         return stmt
 
     def _expr_bp(self, min_bp=0):
+        """
+        Pratt parser implementation.
+
+        Parses expressions based on binding power (operator precedence).
+
+        Supports:
+            ✔ unary operators (NOT, -)
+            ✔ binary operators (+, -, *, /, AND, OR)
+            ✔ logical operators
+            ✔ extensible operators
+
+        min_bp = minimum binding power required to continue parsing
+        """
+
         # ✅ parse left side
         if self._match("NOT"):
             op_token = self._consume()
@@ -903,6 +894,20 @@ class Parser:
         return op
 
     def _is_assignment(self):
+        """
+        Detects valid assignment patterns.
+
+        Supports:
+            ✔ !x = ...
+            ✔ !x[1] = ...
+            ✔ !x.name = ...
+            ✔ chained accesses
+
+        Prevents invalid assignments:
+            ✘ !x + 1 = ...
+            ✘ literal = ...
+        """
+
         pos = self.pos
     
         # ✅ must start with variable
@@ -941,4 +946,11 @@ class Parser:
             return True
     
         return False
-    
+
+    def _parse_optional_paren_expr(self):
+        if self._match("LPAREN"):
+            self._consume()
+            expr = self.expression()
+            self._consume_expected("RPAREN")
+            return expr
+        return self.expression()
