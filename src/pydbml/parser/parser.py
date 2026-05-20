@@ -309,7 +309,12 @@ class Parser:
             node = VariableNode(token.value, is_global=False, token=token)
             return node
         
-        raise SyntaxError(f"Unexpected token: {token.type}")
+        raise raise_error(
+            "SYNTAX_ERROR",
+            f"Unexpected token: {token.type}",
+            node=self._wrap_token(token)
+        )
+
 
     # --------------------------
     # Helpers

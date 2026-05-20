@@ -1,4 +1,4 @@
-DEBUG = True  # toggle this on/off
+DEBUG = False  # toggle this on/off
 
 
 def debug(title: str, data):

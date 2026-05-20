@@ -35,7 +35,7 @@ def collect_py_files(root_dir, output_txt, skip_dirs=None):
 
 
 if __name__ == "__main__":
-    directory_to_scan = r"C:\SKRepo\OpePyDBML"
+    directory_to_scan = r"C:\SKRepo\OpePyDBML\src"
     output_file = "all_python_code.txt"
 
     skip_folders = {

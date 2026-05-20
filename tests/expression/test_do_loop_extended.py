@@ -34,6 +34,8 @@ def test_do_from_to():
 def test_do_from_to_default_step():
     engine = Engine()
 
+    engine.execute("!sum = 0")
+
     engine.execute("""
     do !i from 1 to 3
       !sum = !sum + 1
@@ -42,7 +44,6 @@ def test_do_from_to_default_step():
 
     result = engine.execute("!sum")
     assert result.value == 3
-
 
 def test_do_by_step():
     engine = Engine()

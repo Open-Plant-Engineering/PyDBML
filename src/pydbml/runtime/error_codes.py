@@ -44,7 +44,9 @@ ERROR_CODES = {
     # --------------------------
     # Internal
     # --------------------------
-    "INTERNAL": (99, 1, "Internal error")
+    "INTERNAL": (99, 1, "Internal error"),
+
+    "SYNTAX_ERROR": (100, 1, "Syntax error"),
 }
 
 from pydbml.runtime.exceptions import PyDBMLError

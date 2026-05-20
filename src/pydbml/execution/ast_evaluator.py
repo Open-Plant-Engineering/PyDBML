@@ -377,9 +377,12 @@ class ASTEvaluator:
                     else:
                         value = self.env.get(node.name).get()
                 except KeyError:
-                    # ✅ auto initialize numeric variable
-                    value = Real(0)
-                    self.env.set(node.name, value, node.is_global)
+                    raise raise_error(
+                            "VALUE_ERROR",
+                            f"Variable '{node.name}' is not defined",
+                            node=node,
+                            stack=self.call_stack
+                        )
 
                 debug("VARIABLE RESOLVE", f"{node.name} → {value}")
                 return value
