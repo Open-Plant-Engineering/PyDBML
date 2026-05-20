@@ -61,7 +61,7 @@ class ASTEvaluator:
         self.call_stack = []
         self.debug_mode = False
         self.step_mode = False
-        self.breakpoints = set()
+        self.breakpoints = {}
         self._debug_vars = set()
         self._pipe_cache = {}
         self._attr_cache = {}
@@ -69,6 +69,7 @@ class ASTEvaluator:
         self.step_out_depth = None
         self.debug_log = []
         self.watch_vars = set()
+        self.break_on_exception = False
 
     def evaluate(self, node):
         try:
@@ -607,7 +608,22 @@ class ASTEvaluator:
 
         # ✅ BREAKPOINT
         elif line and line in self.breakpoints:
-            should_pause = True
+            condition_ast = self.breakpoints[line]
+
+            if condition_ast is None:
+                should_pause = True
+            else:
+                try:
+                    cond_val = self.evaluate(condition_ast)
+
+                    # ✅ must be Boolean
+                    if isinstance(cond_val, Boolean) and cond_val.value:
+                        should_pause = True
+                    else:
+                        should_pause = False
+
+                except Exception:
+                    should_pause = False
 
         if not should_pause:
             return
@@ -752,13 +768,64 @@ class ASTEvaluator:
             # --------------------------
             elif cmd in ("q", "quit"):
                 raise SystemExit("Debugger exited")
+            
+            # --------------------------
+            # Conditional Break
+            # --------------------------
+            elif cmd.startswith("b "):
+                # Example: b 8 if !x > 5
+                parts = cmd.split(" ", 2)
 
+                if len(parts) < 2:
+                    print("Usage: b <line> [if condition]")
+                    continue
+                
+                try:
+                    line_no = int(parts[1])
+                except ValueError:
+                    print("Invalid line number")
+                    continue
+                
+                condition_code = None
+
+                if len(parts) == 3 and parts[2].startswith("if "):
+                    condition_code = parts[2][3:].strip()
+
+                self.add_breakpoint(line_no, condition_code)
+
+                print(f"[BREAKPOINT] line {line_no} condition={condition_code}")
+                continue
+
+            # --------------------------
+            # Remove Conditional Break
+            # --------------------------
+            elif cmd.startswith("rb"):
+                parts = cmd.split()
+
+                if len(parts) < 2:
+                    print("Usage: rb <line>")
+                    continue
+                
+                line_no = int(parts[1])
+
+                if line_no in self.breakpoints:
+                    del self.breakpoints[line_no]
+                    print(f"[BREAKPOINT REMOVED] {line_no}")
+                else:
+                    print("No breakpoint at that line")
+
+                continue
             else:
                 print("Commands: c(continue), s(step), n(next), o(out), p var, watch var, unwatch var, bt")
 
-    def add_breakpoint(self, line):
-        self.breakpoints.add(line)
-
+    def add_breakpoint(self, line, condition_code=None):
+        if condition_code:
+            # ✅ parse PyDBML expression
+            parser = Parser(condition_code)
+            ast = parser.parse()
+            self.breakpoints[line] = ast
+        else:
+            self.breakpoints[line] = None
 
     def _eval_do(self, node):
         # --------------------------
