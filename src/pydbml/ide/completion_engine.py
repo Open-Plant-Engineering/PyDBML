@@ -10,6 +10,8 @@ from pydbml.ide.signature_engine import (
     detect_signature_context,
     get_signature_for_call
 )
+from pydbml.ide.hover_engine import get_hover_info
+
 
 def get_completions(code: str, cursor_pos: int, evaluator=None):
     try:
@@ -68,6 +70,10 @@ def get_completions(code: str, cursor_pos: int, evaluator=None):
             return ["get", "set", "init"]
 
         return []
+    
+    hover = get_hover_info(code, cursor_pos, symbols, evaluator)
+    if hover and context == "unknown":
+        return hover
     
     return []
 
