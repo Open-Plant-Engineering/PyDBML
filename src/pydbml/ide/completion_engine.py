@@ -16,18 +16,44 @@ def get_completions(code: str, cursor_pos: int):
 
     # ✅ ! → variables only
     if context == "single_bang":
-        return symbols["variables"]
+        return list(symbols["variables"].keys())
     
     # ✅ !! → functions + globals + objects
     elif context == "double_bang":
         return list(set(
-            symbols["variables"] +
+            list(symbols["variables"].keys()) +
             symbols["functions"] +
             symbols["objects"]
         ))
     
-    # ✅ dot → object methods (still placeholder)
+    # ✅ dot → methods
     elif context == "dot":
-        return ["add", "remove", "length"]  # next step we'll fix this
+        var_name = get_var_before_cursor(code, cursor_pos)
     
-    return []
+        var_type = symbols["variables"].get(var_name)
+    
+        if var_type and var_type in TYPE_METHODS:
+            return TYPE_METHODS[var_type]
+    
+        return []
+
+def get_var_before_cursor(code: str, cursor_pos: int):
+    i = cursor_pos - 2  # skip '.'
+    var_name = ""
+
+    while i >= 0:
+        ch = code[i]
+
+        if ch.isalnum() or ch == "_":
+            var_name = ch + var_name
+            i -= 1
+        else:
+            break
+
+    return var_name
+
+TYPE_METHODS = {
+    "object": ["init", "get", "set"],
+    "number": ["add", "sub", "mul", "div"],
+    "string": ["length", "upper", "lower"]
+}
