@@ -50,6 +50,7 @@ import importlib.util
 from pydbml.runtime.plugin_registry import PluginRegistry
 from pydbml.runtime.exceptions import PyDBMLError
 from pydbml.runtime.error_codes import raise_error
+from pydbml.debugger.debug_controller import DebugController
 
 class ASTEvaluator:
     def __init__(self, env, resolver=None):
@@ -69,7 +70,8 @@ class ASTEvaluator:
         self.step_out_depth = None
         self.debug_log = []
         self.watch_vars = set()
-        self.break_on_exception = False
+        self.debug_controller = DebugController()
+        self.interactive_mode = True
 
     def evaluate(self, node):
         try:
@@ -568,7 +570,7 @@ class ASTEvaluator:
 
         self._method_cache[cls] = method_map
         self._operator_cache[cls] = operator_map
-    
+
     def _trace(self, node):
         if not self.debug_mode:
             return
@@ -583,8 +585,7 @@ class ASTEvaluator:
             line = None
             msg = f"[STEP] depth={len(self.call_stack)} → {node.__class__.__name__}"
 
-        print(msg)
-        self.debug_log.append(msg)
+        self._append_debug_log(msg)
 
         current_depth = len(self.call_stack)
 
@@ -629,7 +630,7 @@ class ASTEvaluator:
             return
 
         # ✅ LOG PAUSE ONCE
-        self.debug_log.append(
+        self._append_debug_log(
             f"[PAUSE] depth={current_depth}, "
             f"step_over={self.step_over_depth}, "
             f"step_out={self.step_out_depth}, "
@@ -641,8 +642,16 @@ class ASTEvaluator:
 
         # ✅ DEBUG LOOP
         while True:
-            cmd = input("(debug) ").strip()
-            self.debug_log.append(f"[CMD] {cmd}")
+            cmd = self.debug_controller.get_next_command()
+
+            if cmd is None:
+                if not self.interactive_mode:
+                    self.step_mode = False
+                    return
+                cmd = input("(debug) ").strip()
+            print(f"(debug) {cmd}")  # optional: simulate input
+
+            self._append_debug_log(f"[CMD] {cmd}")
 
             # --------------------------
             # CONTINUE
@@ -680,12 +689,12 @@ class ASTEvaluator:
             elif cmd.startswith("watch"):
                 parts = cmd.split()
                 if len(parts) < 2:
-                    print("Usage: watch <var>")
+                    self._append_debug_log("Usage: watch <var>")
                     continue
 
                 var_name = parts[1].lower()
                 self.watch_vars.add(var_name)
-                print(f"[WATCH ADDED] {var_name}")
+                self._append_debug_log(f"[WATCH ADDED] {var_name}")
                 continue
 
             # --------------------------
@@ -701,9 +710,9 @@ class ASTEvaluator:
 
                 if var_name in self.watch_vars:
                     self.watch_vars.remove(var_name)
-                    print(f"[WATCH REMOVED] {var_name}")
+                    self._append_debug_log(f"[WATCH REMOVED] {var_name}")
                 else:
-                    print(f"{var_name} not being watched")
+                    self._append_debug_log(f"{var_name} not being watched")
 
                 continue
 
@@ -739,29 +748,29 @@ class ASTEvaluator:
                 for scope in reversed(self.env._local_stack):
                     if var_name in scope:
                         val = scope[var_name].get()
-                        print(f"{var_name} = {val}")
+                        self._append_debug_log(f"{var_name} = {val}")
                         found = True
                         break
 
                 if not found and var_name in self.env._global:
                     val = self.env._global[var_name].get()
-                    print(f"{var_name} (global) = {val}")
+                    self._append_debug_log(f"{var_name} (global) = {val}")
                     found = True
 
                 if not found:
-                    print(f"{var_name} not found")
+                    self._append_debug_log(f"{var_name} not found")
 
             # --------------------------
             # STACK TRACE
             # --------------------------
             elif cmd in ("bt", "stack"):
-                print("Call stack:")
+                self._append_debug_log("[STACK]")
                 for n in reversed(self.call_stack):
                     t = getattr(n, "token", None)
                     if t:
-                        print(f"  Line {t.line}:{t.column} → {n.__class__.__name__}")
+                        self._append_debug_log(f"  Line {t.line}:{t.column} → {n.__class__.__name__}")
                     else:
-                        print(f"  → {n.__class__.__name__}")
+                        self._append_debug_log(f"  → {n.__class__.__name__}")
 
             # --------------------------
             # QUIT
@@ -793,7 +802,8 @@ class ASTEvaluator:
 
                 self.add_breakpoint(line_no, condition_code)
 
-                print(f"[BREAKPOINT] line {line_no} condition={condition_code}")
+                self._append_debug_log(f"[BREAKPOINT] line {line_no} condition={condition_code}")
+
                 continue
 
             # --------------------------
@@ -810,9 +820,9 @@ class ASTEvaluator:
 
                 if line_no in self.breakpoints:
                     del self.breakpoints[line_no]
-                    print(f"[BREAKPOINT REMOVED] {line_no}")
+                    self._append_debug_log(f"[BREAKPOINT REMOVED] {line_no}")
                 else:
-                    print("No breakpoint at that line")
+                    self._append_debug_log("No breakpoint at that line")
 
                 continue
             else:
@@ -1415,3 +1425,8 @@ class ASTEvaluator:
             if not found:
                 print(f"[WATCH] {var} not found")
                 self.debug_log.append(f"[WATCH] {var} not found")
+
+    def _append_debug_log(self, msg,  echo=True):
+        if echo:
+            print(msg)
+        self.debug_log.append(msg)
