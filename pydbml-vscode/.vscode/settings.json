@@ -1,7 +1,7 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "python.analysis.extraPaths": ["./src"],
+    "python.analysis.extraPaths": ["../../src"],
     "python.envFile": "${workspaceFolder}/.env",
     "python.defaultInterpreterPath":"c:/SKRepo/OPE_DB_API/ope-db-api-env/python.exe"
 }
