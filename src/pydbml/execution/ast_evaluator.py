@@ -640,6 +640,12 @@ class ASTEvaluator:
         # ✅ SHOW WATCH VARIABLES
         self._print_watch_vars()
 
+        # ✅ BUILD DEBUG STATE
+        state = self._build_debug_state(node)
+
+        # ✅ SEND IT TO CONTROLLER
+        self.debug_controller.on_pause(state)
+
         # ✅ DEBUG LOOP
         while True:
             cmd = self.debug_controller.get_next_command()
@@ -1430,3 +1436,64 @@ class ASTEvaluator:
         if echo:
             print(msg)
         self.debug_log.append(msg)
+
+    def _build_debug_state(self, node):
+        token = getattr(node, "token", None)
+
+        # ✅ current location
+        line = token.line if token else None
+        col = token.column if token else None
+
+        # ✅ variables
+        locals_vars = {}
+        for scope in self.env._local_stack:
+            for name, var in scope.items():
+                try:
+                    val = var.get()
+                except Exception:
+                    val = var
+                locals_vars[name] = str(val)
+
+        globals_vars = {}
+        for name, var in self.env._global.items():
+            try:
+                val = var.get()
+            except Exception:
+                val = var
+            globals_vars[name] = str(val)
+
+        # ✅ watch values
+        watch = {}
+        for var in self.watch_vars:
+            found = False
+            for scope in reversed(self.env._local_stack):
+                if var in scope:
+                    watch[var] = str(scope[var].get())
+                    found = True
+                    break
+
+            if not found and var in self.env._global:
+                watch[var] = str(self.env._global[var].get())
+            elif not found:
+                watch[var] = None
+
+        # ✅ stack
+        stack = []
+        for n in self.call_stack:
+            t = getattr(n, "token", None)
+            stack.append({
+                "node": n.__class__.__name__,
+                "line": t.line if t else None,
+                "col": t.column if t else None
+            })
+
+        return {
+            "line": line,
+            "column": col,
+            "node": node.__class__.__name__,
+            "depth": len(self.call_stack),
+            "locals": locals_vars,
+            "globals": globals_vars,
+            "watch": watch,
+            "stack": stack
+        }

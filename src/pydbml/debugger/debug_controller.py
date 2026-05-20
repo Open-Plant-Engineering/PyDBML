@@ -2,6 +2,7 @@ class DebugController:
     def __init__(self):
         self.commands = []
         self.index = 0
+        self.last_state = None
 
     def add_commands(self, cmds):
         self.commands.extend(cmds)
@@ -33,4 +34,4 @@ class DebugController:
         self.index = 0
 
     def on_pause(self, state):
-        pass  # future hook
+        self.last_state = state
