@@ -68,6 +68,7 @@ class ASTEvaluator:
         self.step_over_depth = None
         self.step_out_depth = None
         self.debug_log = []
+        self.watch_vars = set()
 
     def evaluate(self, node):
         try:
@@ -577,14 +578,12 @@ class ASTEvaluator:
             line = token.line
             col = token.column
             msg = f"[STEP] depth={len(self.call_stack)} Line {line}:{col} → {node.__class__.__name__}"
-            print(msg)
-            self.debug_log.append(msg)
-
         else:
             line = None
             msg = f"[STEP] depth={len(self.call_stack)} → {node.__class__.__name__}"
-            print(msg)
-            self.debug_log.append(msg)
+
+        print(msg)
+        self.debug_log.append(msg)
 
         current_depth = len(self.call_stack)
 
@@ -602,46 +601,105 @@ class ASTEvaluator:
                 should_pause = True
                 self.step_over_depth = None
 
-        # ✅ NORMAL STEP
+        # ✅ STEP MODE
         elif self.step_mode:
             should_pause = True
 
         # ✅ BREAKPOINT
         elif line and line in self.breakpoints:
             should_pause = True
-        
+
         if not should_pause:
             return
-        
+
+        # ✅ LOG PAUSE ONCE
         self.debug_log.append(
             f"[PAUSE] depth={current_depth}, "
             f"step_over={self.step_over_depth}, "
             f"step_out={self.step_out_depth}, "
             f"step_mode={self.step_mode}"
         )
-        
-        # ✅ interactive debugger loop
-        while True:
 
+        # ✅ SHOW WATCH VARIABLES
+        self._print_watch_vars()
+
+        # ✅ DEBUG LOOP
+        while True:
             cmd = input("(debug) ").strip()
             self.debug_log.append(f"[CMD] {cmd}")
 
+            # --------------------------
+            # CONTINUE
+            # --------------------------
             if cmd in ("c", "continue"):
                 self.step_mode = False
                 return
 
+            # --------------------------
+            # STEP INTO
+            # --------------------------
             elif cmd in ("s", "step"):
                 self.step_mode = True
                 return
 
+            # --------------------------
+            # STEP OVER
+            # --------------------------
+            elif cmd in ("n", "next"):
+                self.step_over_depth = len(self.call_stack)
+                self.step_mode = False
+                return
+
+            # --------------------------
+            # STEP OUT
+            # --------------------------
+            elif cmd in ("o", "out"):
+                self.step_out_depth = len(self.call_stack) - 1
+                self.step_mode = False
+                return
+
+            # --------------------------
+            # WATCH ADD
+            # --------------------------
+            elif cmd.startswith("watch"):
+                parts = cmd.split()
+                if len(parts) < 2:
+                    print("Usage: watch <var>")
+                    continue
+
+                var_name = parts[1].lower()
+                self.watch_vars.add(var_name)
+                print(f"[WATCH ADDED] {var_name}")
+                continue
+
+            # --------------------------
+            # WATCH REMOVE
+            # --------------------------
+            elif cmd.startswith("unwatch"):
+                parts = cmd.split()
+                if len(parts) < 2:
+                    print("Usage: unwatch <var>")
+                    continue
+
+                var_name = parts[1].lower()
+
+                if var_name in self.watch_vars:
+                    self.watch_vars.remove(var_name)
+                    print(f"[WATCH REMOVED] {var_name}")
+                else:
+                    print(f"{var_name} not being watched")
+
+                continue
+
+            # --------------------------
+            # PRINT VARIABLES
+            # --------------------------
             elif cmd.startswith("p"):
                 parts = cmd.split()
-            
-                # ✅ print all variables
+
                 if len(parts) == 1:
                     print("Variables:")
-            
-                    # ✅ local scopes (inner → outer)
+
                     for scope in reversed(self.env._local_stack):
                         for name, var in scope.items():
                             try:
@@ -649,21 +707,18 @@ class ASTEvaluator:
                             except Exception:
                                 val = var
                             print(f"  {name} = {val}")
-            
-                    # ✅ global variables
+
                     for name, var in self.env._global.items():
                         try:
                             val = var.get()
                         except Exception:
                             val = var
                         print(f"  {name} (global) = {val}")
-            
+
                     continue
-                
-                # ✅ print specific variable
+
                 var_name = parts[1].lower()
-            
-                # ✅ check local first
+
                 found = False
                 for scope in reversed(self.env._local_stack):
                     if var_name in scope:
@@ -671,19 +726,18 @@ class ASTEvaluator:
                         print(f"{var_name} = {val}")
                         found = True
                         break
-                    
-                # ✅ fallback global
+
                 if not found and var_name in self.env._global:
                     val = self.env._global[var_name].get()
                     print(f"{var_name} (global) = {val}")
                     found = True
-            
+
                 if not found:
                     print(f"{var_name} not found")
 
-            elif cmd in ("q", "quit"):
-                raise SystemExit("Debugger exited")
-            
+            # --------------------------
+            # STACK TRACE
+            # --------------------------
             elif cmd in ("bt", "stack"):
                 print("Call stack:")
                 for n in reversed(self.call_stack):
@@ -693,19 +747,14 @@ class ASTEvaluator:
                     else:
                         print(f"  → {n.__class__.__name__}")
 
-            elif cmd in ("n", "next"):
-                self.step_over_depth = len(self.call_stack)
-                self.step_mode = False
-                return
+            # --------------------------
+            # QUIT
+            # --------------------------
+            elif cmd in ("q", "quit"):
+                raise SystemExit("Debugger exited")
 
-            elif cmd in ("o", "out"):
-                # ✅ target = parent frame
-                self.step_out_depth = len(self.call_stack) - 1
-                self.step_mode = False
-                return
-            
             else:
-                print("Commands: c(continue), s(step), p var, q(quit)")
+                print("Commands: c(continue), s(step), n(next), o(out), p var, watch var, unwatch var, bt")
 
     def add_breakpoint(self, line):
         self.breakpoints.add(line)
@@ -1272,3 +1321,30 @@ class ASTEvaluator:
         )
 
         return String(text)
+    
+    def _print_watch_vars(self):
+        if not self.watch_vars:
+            return
+
+        for var in sorted(self.watch_vars):
+            found = False
+
+            # ✅ local scopes first
+            for scope in reversed(self.env._local_stack):
+                if var in scope:
+                    val = scope[var].get()
+                    print(f"[WATCH] {var} = {val}")
+                    self.debug_log.append(f"[WATCH] {var} = {val}")
+                    found = True
+                    break
+
+            # ✅ global fallback
+            if not found and var in self.env._global:
+                val = self.env._global[var].get()
+                print(f"[WATCH] {var} = {val} (global)")
+                self.debug_log.append(f"[WATCH] {var} = {val}")
+                found = True
+
+            if not found:
+                print(f"[WATCH] {var} not found")
+                self.debug_log.append(f"[WATCH] {var} not found")
