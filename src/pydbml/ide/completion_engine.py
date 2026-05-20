@@ -6,6 +6,10 @@ from pydbml.ide.method_resolver import (
     get_methods_from_class
 )
 from pydbml.execution.ast_evaluator import ASTEvaluator
+from pydbml.ide.signature_engine import (
+    detect_signature_context,
+    get_signature_for_call
+)
 
 def get_completions(code: str, cursor_pos: int, evaluator=None):
     try:
@@ -15,6 +19,16 @@ def get_completions(code: str, cursor_pos: int, evaluator=None):
 
     except Exception:
         symbols = extract_symbols_safe(code)
+
+    sig_ctx = detect_signature_context(code, cursor_pos)
+
+    if sig_ctx:
+        var_name, method_name = sig_ctx
+
+        sig = get_signature_for_call(symbols, method_name, evaluator, var_name)
+
+        if sig:
+            return sig
 
     context = detect_context(code, cursor_pos)
 
