@@ -1,0 +1,12 @@
+{
+  "name": "pydbml",
+  "activationEvents": ["onLanguage:pydbml"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "pydbml",
+        "extensions": [".pdbml"]
+      }
+    ]
+  }
+}
