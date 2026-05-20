@@ -1,11 +1,17 @@
 {
   "name": "pydbml",
+  "displayName": "PyDBML Language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
   "activationEvents": ["onLanguage:pydbml"],
+  "main": "./extension.js",
   "contributes": {
     "languages": [
       {
         "id": "pydbml",
-        "extensions": [".pdbml"]
+        "extensions": [".pdfnc", ".pdobj", ".pdcmd", ".pdfrm", ".pydbml"]
       }
     ]
   }
