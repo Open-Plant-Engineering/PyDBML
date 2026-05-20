@@ -1,9 +1,13 @@
 from pydbml.ide.context import detect_context
 from pydbml.ide.symbol_extractor import extract_symbols, extract_symbols_safe
 from pydbml.parser.parser import Parser
+from pydbml.ide.method_resolver import (
+    get_class_from_type,
+    get_methods_from_class
+)
+from pydbml.execution.ast_evaluator import ASTEvaluator
 
-
-def get_completions(code: str, cursor_pos: int):
+def get_completions(code: str, cursor_pos: int, evaluator=None):
     try:
         parser = Parser(code)
         ast = parser.parse()
@@ -29,13 +33,29 @@ def get_completions(code: str, cursor_pos: int):
     # ✅ dot → methods
     elif context == "dot":
         var_name = get_var_before_cursor(code, cursor_pos)
-    
         var_type = symbols["variables"].get(var_name)
-    
-        if var_type and var_type in TYPE_METHODS:
-            return TYPE_METHODS[var_type]
-    
+
+        cls = get_class_from_type(var_type)
+
+        # ✅ REAL methods if evaluator given
+        if evaluator and cls:
+            methods = get_methods_from_class(cls, evaluator)
+            if methods:
+                return methods
+
+        # ✅ fallback (for tests without evaluator)
+        if var_type == "number":
+            return ["add", "sub", "mul", "div"]
+
+        if var_type == "string":
+            return ["upper", "lower", "length"]
+
+        if var_type == "object":
+            return ["get", "set", "init"]
+
         return []
+    
+    return []
 
 def get_var_before_cursor(code: str, cursor_pos: int):
     i = cursor_pos - 2  # skip '.'
