@@ -66,6 +66,8 @@ class ASTEvaluator:
         self._pipe_cache = {}
         self._attr_cache = {}
         self.step_over_depth = None
+        self.step_out_depth = None
+        self.debug_log = []
 
     def evaluate(self, node):
         try:
@@ -574,35 +576,55 @@ class ASTEvaluator:
         if token:
             line = token.line
             col = token.column
-            print(f"[STEP] Line {line}:{col} → {node.__class__.__name__}")
+            msg = f"[STEP] depth={len(self.call_stack)} Line {line}:{col} → {node.__class__.__name__}"
+            print(msg)
+            self.debug_log.append(msg)
+
         else:
             line = None
-            print(f"[STEP] → {node.__class__.__name__}")
+            msg = f"[STEP] depth={len(self.call_stack)} → {node.__class__.__name__}"
+            print(msg)
+            self.debug_log.append(msg)
 
         current_depth = len(self.call_stack)
 
         should_pause = False
 
-        # ✅ step over logic
-        if self.step_over_depth is not None:
+        # ✅ STEP OUT
+        if self.step_out_depth is not None:
+            if current_depth <= self.step_out_depth:
+                should_pause = True
+                self.step_out_depth = None
+
+        # ✅ STEP OVER
+        elif self.step_over_depth is not None:
             if current_depth <= self.step_over_depth:
                 should_pause = True
                 self.step_over_depth = None
 
-        # ✅ normal step
+        # ✅ NORMAL STEP
         elif self.step_mode:
             should_pause = True
 
-        # ✅ breakpoint logic (keep existing)
+        # ✅ BREAKPOINT
         elif line and line in self.breakpoints:
-            should_pause = True        
-
+            should_pause = True
+        
         if not should_pause:
             return
-
+        
+        self.debug_log.append(
+            f"[PAUSE] depth={current_depth}, "
+            f"step_over={self.step_over_depth}, "
+            f"step_out={self.step_out_depth}, "
+            f"step_mode={self.step_mode}"
+        )
+        
         # ✅ interactive debugger loop
         while True:
+
             cmd = input("(debug) ").strip()
+            self.debug_log.append(f"[CMD] {cmd}")
 
             if cmd in ("c", "continue"):
                 self.step_mode = False
@@ -670,10 +692,18 @@ class ASTEvaluator:
                         print(f"  Line {t.line}:{t.column} → {n.__class__.__name__}")
                     else:
                         print(f"  → {n.__class__.__name__}")
+
             elif cmd in ("n", "next"):
                 self.step_over_depth = len(self.call_stack)
-                self.step_mode = True
+                self.step_mode = False
                 return
+
+            elif cmd in ("o", "out"):
+                # ✅ target = parent frame
+                self.step_out_depth = len(self.call_stack) - 1
+                self.step_mode = False
+                return
+            
             else:
                 print("Commands: c(continue), s(step), p var, q(quit)")
 
