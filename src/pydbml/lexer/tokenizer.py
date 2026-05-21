@@ -1,6 +1,7 @@
 import re
 from pydbml.lexer.tokens import Token
 from pydbml.utils.debug import debug
+from pydbml.runtime.error_codes import raise_error
 
 DYNAMIC_OPERATORS = {}
 TOKEN_SPEC = [
@@ -160,19 +161,55 @@ def tokenize(code: str):
 
     tokens = []
 
+    # ✅ split source lines (needed for ^ pointer)
+    lines = code.splitlines()
+
     matches = list(_COMPILED_REGEX.finditer(code))
 
-    # ✅ strict validation (no gaps)
+    # -----------------------------------
+    # ✅ STRICT VALIDATION (NO GAPS)
+    # -----------------------------------
     pos = 0
     for match in matches:
         if match.start() != pos:
-            raise SyntaxError(f"Unexpected character at position {pos}")
+            start = pos
+
+            line = code.count("\n", 0, start) + 1
+            last_newline = code.rfind("\n", 0, start)
+            last_newline = last_newline if last_newline >= 0 else -1
+            column = start - last_newline
+
+            dummy = Token("UNKNOWN", code[start], line, column)
+            dummy.source_line = lines[line - 1] if line - 1 < len(lines) else ""
+
+            raise raise_error(
+                "SYNTAX_ERROR",
+                f"Unexpected character '{code[start]}'",
+                node=type("DummyNode", (), {"token": dummy})()
+            )
+
         pos = match.end()
 
     if pos != len(code):
-        raise SyntaxError(f"Unexpected character at position {pos}")
+        start = pos
 
-    # ✅ token creation
+        line = code.count("\n", 0, start) + 1
+        last_newline = code.rfind("\n", 0, start)
+        last_newline = last_newline if last_newline >= 0 else -1
+        column = start - last_newline
+
+        dummy = Token("UNKNOWN", code[start], line, column)
+        dummy.source_line = lines[line - 1] if line - 1 < len(lines) else ""
+
+        raise raise_error(
+            "SYNTAX_ERROR",
+            f"Unexpected character '{code[start]}'",
+            node=type("DummyNode", (), {"token": dummy})()
+        )
+
+    # -----------------------------------
+    # ✅ TOKEN CREATION
+    # -----------------------------------
     for match in matches:
         kind = match.lastgroup
         value = match.group()
@@ -186,6 +223,7 @@ def tokenize(code: str):
         last_newline = last_newline if last_newline >= 0 else -1
         column = start - last_newline
 
+        # ✅ normalize values
         if kind in {"IF", "THEN", "ELSE", "AND", "OR", "NOT"}:
             value = value.upper()
 
@@ -195,7 +233,13 @@ def tokenize(code: str):
         if kind in {"LOCAL_VAR", "GLOBAL_VAR"}:
             value = value.lower()
 
-        tokens.append(Token(kind, value, line, column))
+        # ✅ create token
+        t = Token(kind, value, line, column)
+
+        # ✅ attach source line for pointer (^)
+        t.source_line = lines[line - 1] if line - 1 < len(lines) else ""
+
+        tokens.append(t)
 
     return tokens
 

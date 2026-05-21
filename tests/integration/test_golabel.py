@@ -1,5 +1,5 @@
 from pydbml.core.engine import Engine
-
+from pydbml.runtime.exceptions import PyDBMLError
 
 # ✅ 1. Basic forward jump
 def test_basic_golabel():
@@ -183,10 +183,11 @@ def test_label_keyword_name_not_allowed():
 
     try:
         e.execute(code)
-    except SyntaxError:
-        assert True
-    else:
-        assert False
+    except PyDBMLError as err:
+        assert "Invalid label name" in str(err)
+        return
+
+    assert False, "Expected error"
 
 import pytest
 

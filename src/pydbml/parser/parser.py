@@ -1,4 +1,5 @@
 from pydbml.lexer.tokenizer import tokenize
+from pydbml.runtime.error_codes import raise_error
 from pydbml.ast.nodes import (
     NumberNode,
     StringNode,
@@ -70,6 +71,10 @@ class Parser:
             "AMP": 40,
         }
 
+    class DummyNode:
+        def __init__(self, token):
+            self.token = token
+
     # --------------------------
     # Entry
     # --------------------------
@@ -90,13 +95,21 @@ class Parser:
 
             # expect '/'
             if not self._match("DIV"):
-                raise SyntaxError("Expected '/' before label name")
+                raise raise_error(
+                    "SYNTAX_ERROR",
+                    "Expected '/' before label name",
+                    node=self._wrap_token(self._peek())
+                )
 
             self._consume()  # consume '/'
 
             name_token = self._consume()
             if name_token.type != "IDENTIFIER":
-                raise SyntaxError(f"Invalid label name '{name_token.value}' (keyword not allowed)")
+                raise raise_error(
+                    "SYNTAX_ERROR",
+                    f"Invalid label name '{name_token.value}'",
+                    node=self._wrap_token(name_token)
+                )
 
             name = "/" + name_token.value.lower()
 
@@ -182,7 +195,11 @@ class Parser:
             if self._peek_next() and self._peek_next().value.lower() == "method":
                 return self._attach_handle(self._parse_method_def())
 
-            raise SyntaxError("Unknown DEFINE type")
+            raise raise_error(
+                "SYNTAX_ERROR",
+                "Unknown DEFINE type",
+                node=self._wrap_token(self._peek())
+            )
 
         if self._match("RETURN"):
             return self._attach_handle(self._parse_return())
@@ -204,7 +221,11 @@ class Parser:
                 if isinstance(left, DotAccessNode):
                     return self._attach_handle(DotAssignNode(left.target, left.attribute, value))
 
-                raise SyntaxError("Invalid assignment target")
+                raise raise_error(
+                    "SYNTAX_ERROR",
+                    "Invalid assignment target",
+                    node=self._wrap_token(self._peek())
+                )
 
         stmt = self.expression()
         return self._attach_handle(stmt)
@@ -258,7 +279,11 @@ class Parser:
             type_token = self._consume()
         
             if type_token.type != "IDENTIFIER":
-                raise SyntaxError("Expected type after 'object'")
+                raise raise_error(
+                    "SYNTAX_ERROR",
+                    "Expected type after 'object'",
+                    node=self._wrap_token(type_token)
+                )
         
             type_name = type_token.value.lower()
         
@@ -341,9 +366,19 @@ class Parser:
         token = self._peek()
 
         if token is None:
-            raise SyntaxError(f"Expected {token_type}, but reached end of input")
+            raise raise_error(
+                "SYNTAX_ERROR",
+                f"Expected {token_type}, but reached end of input",
+                node=self._wrap_token(self.tokens[self.pos - 1] if self.pos > 0 else None)
+            )
+
         if token.type != token_type:
-            raise SyntaxError(f"Expected {token_type}, got {token.type}")
+            raise raise_error(
+                "SYNTAX_ERROR",
+                f"Expected {token_type}, got {token.type}",
+                node=self._wrap_token(token)
+            )
+         
         return self._consume()
 
     def _match(self, *types):
@@ -407,7 +442,11 @@ class Parser:
         name_token = self._consume()
     
         if name_token.type != "GLOBAL_VAR":
-            raise SyntaxError("Function name must be global (!!)")
+            raise raise_error(
+                "SYNTAX_ERROR",
+                "Function name must be global (!!)",
+                node=self._wrap_token(name_token)
+            )
     
         func_name = name_token.value.replace("!", "").lower()
     
@@ -424,7 +463,11 @@ class Parser:
                 var_token = self._consume()
     
                 if var_token.type != "LOCAL_VAR":
-                    raise SyntaxError("Expected parameter name (!var)")
+                    raise raise_error(
+                        "SYNTAX_ERROR",
+                        "Expected parameter name (!var)",
+                        node=self._wrap_token(var_token)
+                    )
     
                 param_name = var_token.value.replace("!", "")
     
@@ -501,7 +544,11 @@ class Parser:
                 members[attr] = type_token.value.upper()
                 continue
 
-            raise SyntaxError(f"Unexpected token in object: {token}")
+            raise raise_error(
+                "SYNTAX_ERROR",
+                f"Unexpected token in object: {token.type}",
+                node=self._wrap_token(token)
+            )
 
         # ✅ consume ENDOBJECT
         self._consume_expected("ENDOBJECT")
@@ -958,3 +1005,6 @@ class Parser:
             self._consume_expected("RPAREN")
             return expr
         return self.expression()
+
+    def _wrap_token(self, token):
+        return self.DummyNode(token)

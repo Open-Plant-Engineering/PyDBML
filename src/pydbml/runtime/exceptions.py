@@ -16,10 +16,25 @@ class PyDBMLError(Exception):
         # ✅ PRIMARY SYSTEM (unchanged)
         lines.append(f"({self.code1}, {self.code2}) {self.message}")
 
-        # ✅ ADD DEBUG CONTEXT (non-breaking)
+        pointer_block = None
+
+        # ✅ LOCATION + POINTER
         if self.node and hasattr(self.node, "token") and self.node.token:
             t = self.node.token
+
+            # ✅ try to show source line + ^
+            source = getattr(t, "source_line", None)
+
+            if source:
+                pointer = " " * (t.column - 1) + "^"
+                pointer_block = f"{source}\n{pointer}"
+
+            # ✅ location line (unchanged)
             lines.append(f"Line {t.line}, Column {t.column}")
+
+        # ✅ insert pointer block AFTER message but BEFORE location
+        if pointer_block:
+            lines.insert(1, pointer_block)
 
         # ✅ TRACEBACK (optional)
         if self.stack:

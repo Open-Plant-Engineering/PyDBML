@@ -8,6 +8,11 @@ ERROR_CODES = {
     "VALUE_ERROR": (10, 2, "Invalid value"),
 
     # --------------------------
+    # Syntax
+    # --------------------------
+    "SYNTAX_ERROR": (10, 3, "Syntax error"),
+
+    # --------------------------
     # Variables / Scope
     # --------------------------
     "NAME_ERROR": (11, 1, "Variable not defined"),
@@ -45,17 +50,31 @@ ERROR_CODES = {
     # Internal
     # --------------------------
     "INTERNAL": (99, 1, "Internal error"),
-
-    "SYNTAX_ERROR": (100, 1, "Syntax error"),
 }
 
 from pydbml.runtime.exceptions import PyDBMLError
 
+
 def raise_error(key, message=None, node=None, stack=None):
+    """
+    ✅ Unified error creation function.
+
+    key → error type (TYPE_ERROR, SYNTAX_ERROR, ...)
+    message → custom message
+    node → AST node or token wrapper (for line/column)
+    stack → call stack (for traceback)
+    """
+
     if key not in ERROR_CODES:
-        # fallback
-        code1, code2, default_msg = ERROR_CODES["INTERNAL_ERROR"]
-        return PyDBMLError(code1, code2, message or f"Unknown error key: {key}", node=node, stack=stack)
+        # ✅ fallback
+        code1, code2, default_msg = ERROR_CODES["INTERNAL"]
+        return PyDBMLError(
+            code1,
+            code2,
+            message or f"Unknown error key: {key}",
+            node=node,
+            stack=stack
+        )
 
     code1, code2, default_msg = ERROR_CODES[key]
 
