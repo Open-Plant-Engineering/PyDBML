@@ -1,5 +1,6 @@
 from pydbml.core.engine import Engine
-
+import pytest
+from pydbml.runtime.exceptions import PyDBMLError
 
 def setup_lib(tmp_path, code, name="TEST"):
     lib = tmp_path / "pdlib"
@@ -40,11 +41,10 @@ define function !!ADD(!x is real) is real
 endfunction
 """, "ADD")   # ✅ IMPORTANT FIX
 
-    try:
+    with pytest.raises(PyDBMLError) as err:
         engine.execute("!!ADD('abc')")
-        assert False
-    except TypeError:
-        assert True
+
+    assert "expects REAL" in str(err.value)
 
 
 # --------------------------
@@ -58,11 +58,10 @@ define function !!BAD() is real
 endfunction
 """, "BAD")
 
-    try:
+    with pytest.raises(PyDBMLError) as err:
         engine.execute("!!BAD()")
-        assert False
-    except TypeError:
-        assert True
+    
+    assert "Expected REAL" in str(err.value)
 
 
 # --------------------------

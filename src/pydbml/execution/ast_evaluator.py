@@ -293,7 +293,11 @@ class ASTEvaluator:
                 debug("NOT VALUE", value)
 
                 if not isinstance(value, Boolean):
-                    raise TypeError("NOT requires BOOLEAN value")
+                    raise raise_error(
+                        "TYPE_ERROR",
+                        "NOT requires BOOLEAN value",
+                        node=node
+                    )
 
                 return Boolean(not value.value)
 
@@ -378,7 +382,7 @@ class ASTEvaluator:
                         value = self.env.get(node.name).get()
                 except KeyError:
                     raise raise_error(
-                            "VALUE_ERROR",
+                            "NAME_ERROR",
                             f"Variable '{node.name}' is not defined",
                             node=node,
                             stack=self.call_stack
@@ -406,7 +410,16 @@ class ASTEvaluator:
             
             # ✅ Python semantic/runtime errors → keep as-is
             if isinstance(e, (KeyError, TypeError, ValueError)):
-                raise
+                msg = str(e)
+                if not msg or msg == "Ellipsis":
+                    msg = "Invalid operation"
+
+                raise raise_error(
+                    "TYPE_ERROR",
+                    msg,
+                    node=node,
+                    stack=self.call_stack.copy()
+                )
             
             # ✅ only unexpected/internal errors → wrap
             raise raise_error(
@@ -432,8 +445,10 @@ class ASTEvaluator:
             for (param_name, param_type), value in zip(method_node.params, args):
 
                 if not check_type(value, param_type):
-                    raise TypeError(
-                        f"{param_name} expects {param_type}"
+                    raise raise_error(
+                        "TYPE_ERROR",
+                        f"{param_name} expects {param_type}",
+                        node=method_node
                     )
 
                 self.env.set(param_name, value, False)
@@ -501,7 +516,10 @@ class ASTEvaluator:
                 try:
                     idx = int(k)
                 except Exception:
-                    raise TypeError("Dict keys must be convertible to int")
+                    raise raise_error(
+                        "TYPE_ERROR",
+                        "Dict keys must be convertible to int"
+                    )
 
                 arr.set(idx, self._to_pydbml(v))  # ✅ recursive
             return arr
@@ -1113,14 +1131,20 @@ class ASTEvaluator:
         if isinstance(func_ast, list):
             func_ast = func_ast[0]
 
-        if not isinstance(func_ast, FunctionDefNode):
-            raise Exception(f"{node.name} is not a valid function")
+        if not isinstance(func_ast, FunctionDefNode):    
+            raise raise_error(
+                "NAME_ERROR",
+                f"{node.name} is not a valid function",
+                node=node
+            )
 
         arg_values = [self.evaluate(arg) for arg in node.args]
 
         if len(arg_values) != len(func_ast.params):
-            raise Exception(
-                f"{node.name} expects {len(func_ast.params)} args, got {len(arg_values)}"
+            raise raise_error(
+                "ARG_COUNT",
+                f"{node.name} expects {len(func_ast.params)} args, got {len(arg_values)}",
+                node=node
             )
 
         self.env.push_scope()
@@ -1128,7 +1152,11 @@ class ASTEvaluator:
         try:
             for (param_name, param_type), value in zip(func_ast.params, arg_values):
                 if not check_type(value, param_type):
-                    raise TypeError(...)
+                    raise raise_error(
+                        "TYPE_ERROR",
+                        f"{param_name} expects {param_type}",
+                        node=node
+                    )
 
                 self.env.set(param_name, value, is_global=False)
 
@@ -1139,8 +1167,12 @@ class ASTEvaluator:
             return result
 
         except ReturnSignal as r:
-            if not check_type(r.value, func_ast.return_type):
-                raise TypeError(...)
+            if not check_type(r.value, func_ast.return_type):               
+                raise raise_error(
+                    "RETURN_TYPE",
+                    f"Expected {func_ast.return_type}, got {type(r.value).__name__}",
+                    node=node
+                )
 
             return r.value
 
@@ -1168,8 +1200,10 @@ class ASTEvaluator:
                     if len(method.params) == len(args):
                         return self._execute_method(target, method, args)
 
-                raise Exception(
-                    f"No matching overload for {method_name} with {len(args)} args"
+                raise raise_error(
+                    "OVERLOAD_NOT_FOUND",
+                    f"{method_name} with {len(args)} args",
+                    node=node
                 )
 
         # --------------------------
