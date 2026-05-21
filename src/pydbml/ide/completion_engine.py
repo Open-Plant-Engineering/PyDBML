@@ -17,7 +17,7 @@ def get_completions(code: str, cursor_pos: int, evaluator=None):
     try:
         parser = Parser(code)
         ast = parser.parse()
-        symbols = extract_symbols(ast)
+        symbols = extract_symbols(ast, evaluator)
 
     except Exception:
         symbols = extract_symbols_safe(code)
@@ -49,9 +49,19 @@ def get_completions(code: str, cursor_pos: int, evaluator=None):
     # ✅ dot → methods
     elif context == "dot":
         var_name = get_var_before_cursor(code, cursor_pos)
-        var_type = symbols["variables"].get(var_name)
-
-        cls = get_class_from_type(var_type)
+        cls = None
+        
+        if evaluator:
+            try:
+                var_value = evaluator.env.get(var_name).get()
+                cls = var_value.__class__
+            except Exception:
+                pass
+            
+        # fallback
+        if not cls:
+            var_type = symbols["variables"].get(var_name)
+            cls = get_class_from_type(var_type)
 
         # ✅ REAL methods if evaluator given
         if evaluator and cls:

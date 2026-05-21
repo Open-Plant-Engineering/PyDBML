@@ -29,6 +29,14 @@ def get_methods_from_class(cls, evaluator):
 
     method_map = evaluator._method_cache.get(cls, {})
 
-    # ✅ return method names (lowercase)
-    return [name.lower() for name in method_map.keys()]
+    clean_methods = []
+
+    for name in method_map.keys():
+        # ✅ remove internal python methods
+        if name.startswith("__"):
+            continue
+
+        clean_methods.append(name.lower())
+
+    return clean_methods
 

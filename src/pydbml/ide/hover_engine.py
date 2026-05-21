@@ -73,9 +73,19 @@ def get_hover_info(code: str, cursor_pos: int, symbols, evaluator=None):
             var_name = code[j] + var_name
             j -= 1
 
-        var_type = symbols["variables"].get(var_name)
+        cls = None
 
-        cls = get_class_from_type(var_type)
+        if evaluator:
+            try:
+                var_value = evaluator.env.get(var_name).get()
+                cls = var_value.__class__
+            except Exception:
+                pass
+
+        # fallback
+        if not cls:
+            var_type = symbols["variables"].get(var_name)
+            cls = get_class_from_type(var_type)
 
         if evaluator and cls:
             if cls not in evaluator._method_cache:

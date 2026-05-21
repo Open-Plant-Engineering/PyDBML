@@ -73,8 +73,19 @@ from pydbml.ide.method_resolver import get_class_from_type
 
 
 def get_signature_for_call(symbols, method_name, evaluator, var_name):
-    var_type = symbols["variables"].get(var_name)
-    cls = get_class_from_type(var_type)
+    cls = None
+    
+    if evaluator:
+        try:
+            var_value = evaluator.env.get(var_name).get()
+            cls = var_value.__class__
+        except Exception:
+            pass
+        
+    # fallback
+    if not cls:
+        var_type = symbols["variables"].get(var_name)
+        cls = get_class_from_type(var_type)
 
     if not cls or not evaluator:
         return None

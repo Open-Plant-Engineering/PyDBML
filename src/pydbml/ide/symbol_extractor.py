@@ -1,7 +1,7 @@
 from pydbml.ast.nodes import AssignNode, FunctionDefNode, ObjectNode, NumberNode, StringNode
 
 
-def extract_symbols(ast):
+def extract_symbols(ast, evaluator=None):
     variables = {}
     functions = set()
     objects = set()
@@ -10,16 +10,23 @@ def extract_symbols(ast):
         if isinstance(node, AssignNode):
             name = node.name
 
-            # ✅ detect type
-            if isinstance(node.value, ObjectNode):
-                var_type = "object"
-                objects.add(name)
+            if evaluator:
+                try:
+                    value = evaluator.evaluate(node.value)
 
-            elif isinstance(node.value, NumberNode):
-                var_type = "number"
+                    if value.__class__.__name__ == "Real":
+                        var_type = "number"
+                    elif value.__class__.__name__ == "String":
+                        var_type = "string"
+                    elif value.__class__.__name__ == "Array":
+                        var_type = "array"
+                    elif value.__class__.__name__ == "ObjectInstance":
+                        var_type = "object"
+                    else:
+                        var_type = "unknown"
 
-            elif isinstance(node.value, StringNode):
-                var_type = "string"
+                except Exception:
+                    var_type = "unknown"
 
             else:
                 var_type = "unknown"
@@ -30,7 +37,7 @@ def extract_symbols(ast):
             functions.add(node.name)
 
     return {
-        "variables": variables,   # ✅ changed
+        "variables": variables,
         "functions": list(functions),
         "objects": list(objects)
     }
