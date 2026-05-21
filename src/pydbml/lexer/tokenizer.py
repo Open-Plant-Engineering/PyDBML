@@ -32,6 +32,7 @@ TOKEN_SPEC = [
     ("IF", r"\bif\b"),
     ("THEN", r"\bthen\b"),
     ("ELSE", r"\belse\b"),
+    ("ELSEIF", r"\belseif\b"),
     ("ENDIF", r"\bendif\b"),
 
     ("HANDLE", r"\bhandle\b"),

@@ -1015,29 +1015,53 @@ class ASTEvaluator:
                 "IF condition must be BOOLEAN",
                 node=node
             )
-    
-        # ✅ Expression IF
+
+        # --------------------------
+        # ✅ EXPRESSION IF
+        # --------------------------
         if node.is_expression:
             if condition.value:
-                result = self.evaluate(node.then_branch)
+                return self.evaluate(node.then_branch)
             else:
-                result = self.evaluate(node.else_branch)
+                return self.evaluate(node.else_branch)
     
-            return result
-    
-        # ✅ Block IF
+        # --------------------------
+        # ✅ BLOCK IF
+        # --------------------------
         if condition.value:
             result = None
             for stmt in node.then_branch:
                 result = self.evaluate(stmt)
             return result
-    
+
+        # --------------------------
+        # ✅ ELIF BLOCKS
+        # --------------------------
+        for cond, block in getattr(node, "elif_blocks", []):
+            cond_val = self.evaluate(cond)
+
+            if not isinstance(cond_val, Boolean):
+                raise raise_error(
+                    "TYPE_ERROR",
+                    "ELSEIF condition must be BOOLEAN",
+                    node=cond
+                )
+
+            if cond_val.value:
+                result = None
+                for stmt in block:
+                    result = self.evaluate(stmt)
+                return result
+
+        # --------------------------
+        # ✅ ELSE BLOCK
+        # --------------------------
         if node.else_branch is not None:
             result = None
             for stmt in node.else_branch:
                 result = self.evaluate(stmt)
             return result
-    
+
         return None
 
     def _eval_binary(self, node):

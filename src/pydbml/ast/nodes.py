@@ -81,12 +81,21 @@ class IfNode(ASTNode):
                 ...
             ENDIF
     """
-    def __init__(self, condition, then_branch, else_branch=None, is_expression=False, token=None):
+    def __init__(
+        self,
+        condition,
+        then_branch,
+        else_branch,
+        is_expression=False,
+        elif_blocks=None,
+        token=None,
+    ):
         super().__init__(token)
         self.condition = condition
         self.then_branch = then_branch
         self.else_branch = else_branch
         self.is_expression = is_expression
+        self.elif_blocks = elif_blocks or []
 
 # --------------------------
 # Logical Operations

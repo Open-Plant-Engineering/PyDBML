@@ -427,7 +427,7 @@ class Parser:
         # --------------------------
         # ✅ CONDITION (support both styles)
         # --------------------------
-        condition = self._parse_optional_paren_expr()
+        if_condition = self._parse_optional_paren_expr()
 
         self._consume_expected("THEN")
 
@@ -442,7 +442,7 @@ class Parser:
             self._consume_expected("ELSE")
             else_expr = self.expression()
         
-            return IfNode(condition, then_expr, else_expr, is_expression=True, token=condition.token)
+            return IfNode(if_condition, then_expr, else_expr, is_expression=True, token=if_condition.token)
         
         except Exception:
             # rollback and parse as block IF
@@ -453,8 +453,29 @@ class Parser:
         # --------------------------
         then_branch = []
 
-        while not self._at_end() and not self._match("ENDIF") and not self._match("ELSE"):
+        while not self._at_end() and not self._match("ENDIF") and not self._match("ELSE") and not self._match("ELSEIF"):
             then_branch.append(self.statement())
+
+        elif_blocks = [] 
+        # ✅ parse elseif blocks
+
+        while self._match("ELSEIF"):
+            self._consume()
+
+            elif_condition = self._parse_optional_paren_expr()
+            self._consume_expected("THEN")
+
+            block = []
+
+            while (
+                not self._at_end()
+                and not self._match("ENDIF")
+                and not self._match("ELSE")
+                and not self._match("ELSEIF")
+            ):
+                block.append(self.statement())
+
+            elif_blocks.append((elif_condition, block))
 
         else_branch = None
 
@@ -468,7 +489,7 @@ class Parser:
         # ✅ IMPORTANT — now ENDIF must exist
         self._consume_expected("ENDIF")
 
-        return IfNode(condition, then_branch, else_branch, is_expression=False)
+        return IfNode(if_condition, then_branch, else_branch, is_expression=False, elif_blocks=elif_blocks, token=if_condition.token)
 
     def _parse_function_def(self):
         self._consume_expected("DEFINE")
