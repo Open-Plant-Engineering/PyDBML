@@ -42,6 +42,7 @@ from pydbml.ast.nodes import (
     StringNode,
     BooleanNode,
     AssignNode,
+    PrintNode,
 )
 from pydbml.parser.parser import Parser
 from pydbml.utils.debug import debug
@@ -81,6 +82,16 @@ class ASTEvaluator:
             debug("NODE START", node)
             self.call_stack.append(node)
             self._trace(node)
+
+            if isinstance(node, PrintNode):
+                value = self.evaluate(node.expr)
+
+                if hasattr(value, "value"):
+                    print(value.value)
+                else:
+                    print(value)
+
+                return value
 
             if isinstance(node, GoLabelNode):
                 raise GoLabelSignal(node.name)
@@ -1078,6 +1089,27 @@ class ASTEvaluator:
 
     def _eval_function_call(self, node):
         name = node.name.lower()
+
+        if name == "iftrue":
+            if len(node.args) != 3:
+                raise raise_error(
+                    "ARG_COUNT",
+                    "iftrue expects 3 arguments",
+                    node=node
+                )
+
+            cond = self.evaluate(node.args[0])
+
+            if not isinstance(cond, Boolean):
+                raise raise_error(
+                    "TYPE_ERROR",
+                    "iftrue condition must be BOOLEAN",
+                    node=node
+                )
+
+            return self.evaluate(
+                node.args[1] if cond.value else node.args[2]
+            )
 
         # --------------------------
         # ✅ REGISTERED FUNCTIONS

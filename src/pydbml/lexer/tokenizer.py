@@ -8,6 +8,7 @@ TOKEN_SPEC = [
     
     ("COMMENT_BLOCK", r"\$\([\s\S]*?\$\)"),
     ("COMMENT_LINE", r"--.*"),
+    ("PRINT", r"\$P"),
 
     # --------------------------
     # Keywords (MUST COME FIRST)

@@ -90,6 +90,11 @@ class Parser:
     def statement(self):
         token = self._peek()
 
+        if self._match("PRINT"):   # or COMMAND_PRINT depending on tokenizer
+            token = self._consume()
+            expr = self.expression()
+            return PrintNode(expr, token=token)
+
         if self._match("LABEL"):
             self._consume()
 
@@ -331,9 +336,28 @@ class Parser:
             return node
         
         if token.type == "IDENTIFIER":
-            node = VariableNode(token.value, is_global=False, token=token)
-            return node
-        
+            name = token.value.lower()
+
+            # ✅ support function call: iftrue(...)
+            if self._match("LPAREN"):
+                self._consume()  # consume '('
+
+                args = []
+
+                if not self._match("RPAREN"):
+                    args.append(self._parse_expression_bp())
+
+                    while self._match("COMMA"):
+                        self._consume()
+                        args.append(self._parse_expression_bp())
+
+                self._consume_expected("RPAREN")
+
+                return FunctionCallNode(name, args, token=token)
+
+            # ✅ otherwise variable
+            return VariableNode(name, is_global=False, token=token)
+
         raise raise_error(
             "SYNTAX_ERROR",
             f"Unexpected token: {token.type}",
