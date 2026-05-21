@@ -803,12 +803,24 @@ class Parser:
 
         condition = None
 
-        if self._match("LPAREN"):
+        # ✅ NEW: HANDLE ANY support
+        if self._match("ANY"):
+            self._consume()
+            condition = "ANY"
+
+        elif self._match("LPAREN"):
             self._consume()
 
             code1 = int(self._consume().value)
-            self._consume_expected("COMMA")
-            code2 = int(self._consume().value)
+            code2 = None
+
+            # ✅ check if second value exists
+            if self._match("COMMA"):
+                self._consume()
+
+                # ✅ ONLY consume second value if it's not ')'
+                if not self._match("RPAREN"):
+                    code2 = int(self._consume().value)
 
             self._consume_expected("RPAREN")
 
@@ -837,8 +849,16 @@ class Parser:
                 self._consume_expected("LPAREN")
 
                 code1 = int(self._consume().value)
-                self._consume_expected("COMMA")
-                code2 = int(self._consume().value)
+                
+                code2 = None
+                
+                # ✅ check if second value exists
+                if self._match("COMMA"):
+                    self._consume()
+                
+                    # ✅ ONLY consume second value if it's not ')'
+                    if not self._match("RPAREN"):
+                        code2 = int(self._consume().value)
 
                 self._consume_expected("RPAREN")
 

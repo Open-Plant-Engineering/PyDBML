@@ -116,16 +116,28 @@ class ASTEvaluator:
                 
                     for condition, block in node.handlers:
                     
+                        # ✅ HANDLE ANY
                         if condition == "ANY":
                             for stmt in block:
                                 self.evaluate(stmt)
                             return None
 
+                        # ✅ HANDLE (code1, code2) or (code1,)
                         if isinstance(condition, tuple):
-                            if (e.code1, e.code2) == condition:
-                                for stmt in block:
-                                    self.evaluate(stmt)
-                                return None
+                        
+                            # ✅ SINGLE CODE MATCH (code1, None)
+                            if len(condition) == 2 and condition[1] is None:
+                                if e.code1 == condition[0]:
+                                    for stmt in block:
+                                        self.evaluate(stmt)
+                                    return None
+
+                            # ✅ EXACT MATCH (code1, code2)
+                            elif len(condition) == 2:
+                                if (e.code1, e.code2) == condition:
+                                    for stmt in block:
+                                        self.evaluate(stmt)
+                                    return None
 
                     raise
                 
