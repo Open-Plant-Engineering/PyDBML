@@ -50,7 +50,7 @@ def get_completions(code: str, cursor_pos: int, evaluator=None):
     elif context == "dot":
         var_name = get_var_before_cursor(code, cursor_pos)
         cls = None
-        
+
         if evaluator:
             try:
                 var_value = evaluator.env.get(var_name).get()
@@ -66,8 +66,19 @@ def get_completions(code: str, cursor_pos: int, evaluator=None):
         # ✅ REAL methods if evaluator given
         if evaluator and cls:
             methods = get_methods_from_class(cls, evaluator)
-            if methods:
-                return methods
+
+            # ✅ filter by what user typed
+            prefix = ""
+
+            i = cursor_pos - 1
+            while i >= 0 and (code[i].isalnum() or code[i] == "_"):
+                prefix = code[i] + prefix
+                i -= 1
+
+            if prefix:
+                methods = [m for m in methods if m.startswith(prefix.lower())]
+
+            return methods
 
         # ✅ fallback (for tests without evaluator)
         if var_type == "number":
@@ -88,22 +99,22 @@ def get_completions(code: str, cursor_pos: int, evaluator=None):
     return []
 
 def get_var_before_cursor(code: str, cursor_pos: int):
-    i = cursor_pos - 2  # skip '.'
+    i = cursor_pos - 1
+
+    # ✅ skip current method typing
+    while i >= 0 and (code[i].isalnum() or code[i] == "_"):
+        i -= 1
+
+    # ✅ must be dot
+    if i < 0 or code[i] != ".":
+        return ""
+
+    i -= 1
+
     var_name = ""
 
-    while i >= 0:
-        ch = code[i]
-
-        if ch.isalnum() or ch == "_":
-            var_name = ch + var_name
-            i -= 1
-        else:
-            break
+    while i >= 0 and (code[i].isalnum() or code[i] == "_"):
+        var_name = code[i] + var_name
+        i -= 1
 
     return var_name
-
-TYPE_METHODS = {
-    "object": ["init", "get", "set"],
-    "number": ["add", "sub", "mul", "div"],
-    "string": ["length", "upper", "lower"]
-}
