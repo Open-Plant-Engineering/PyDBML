@@ -30,6 +30,7 @@ from pydbml.ast.nodes import (
     LabelNode,
     LogicalOpNode,
     NotNode,
+    PrintNode,
 )
 
 class Parser:
@@ -90,9 +91,19 @@ class Parser:
     def statement(self):
         token = self._peek()
 
-        if self._match("PRINT"):   # or COMMAND_PRINT depending on tokenizer
+        if self._match("PRINT"):
             token = self._consume()
+
+            # ✅ ensure something exists after $P
+            if self._peek() is None:
+                raise raise_error(
+                    "SYNTAX_ERROR",
+                    "Expected expression after $P",
+                    node=self._wrap_token(token)
+                )
+
             expr = self.expression()
+
             return PrintNode(expr, token=token)
 
         if self._match("LABEL"):

@@ -85,12 +85,8 @@ class ASTEvaluator:
 
             if isinstance(node, PrintNode):
                 value = self.evaluate(node.expr)
-
-                if hasattr(value, "value"):
-                    print(value.value)
-                else:
-                    print(value)
-
+                val = value.value if hasattr(value, "value") else value
+                print(val)
                 return value
 
             if isinstance(node, GoLabelNode):

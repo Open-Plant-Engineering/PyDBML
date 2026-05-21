@@ -8,7 +8,6 @@ TOKEN_SPEC = [
     
     ("COMMENT_BLOCK", r"\$\([\s\S]*?\$\)"),
     ("COMMENT_LINE", r"--.*"),
-    ("PRINT", r"\$P"),
 
     # --------------------------
     # Keywords (MUST COME FIRST)
@@ -67,6 +66,7 @@ TOKEN_SPEC = [
     # Custom tokens
     # --------------------------
     ("COMMAND_VAR", r"\$\!\!?[a-zA-Z_][a-zA-Z0-9_]*"),
+    ("PRINT", r"\$[pP]"),
     ("STRING_PIPE", r"\|[\s\S]*?\|"),
     ("STRING", r"'[^']*'"),
 
