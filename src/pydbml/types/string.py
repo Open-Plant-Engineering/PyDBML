@@ -7,10 +7,6 @@ class String(PyDBMLType):
     def __init__(self, value):
         self.value = value
 
-    @pydbml_method("LENGTH")
-    def length(self):
-        return len(self.value)
-
     def validate(self):
         if not isinstance(self.value, str):
             raise TypeError("Invalid string")
@@ -23,3 +19,15 @@ class String(PyDBMLType):
             return str(v)
 
         return self.value + fmt(other)
+
+    @pydbml_method("UPPER")
+    def upper(self):
+        return self.value.upper()
+
+    @pydbml_method("LOWER")
+    def lower(self):
+        return self.value.lower()
+
+    @pydbml_method("LENGTH")
+    def length(self):
+        return len(self.value)
