@@ -20,9 +20,9 @@ $P !z
 ```
 
 if (!x > 5) then
-$P "greater"
+    $P "greater"
 else
-$P "smaller"
+    $P "smaller"
 endif
 
 ```
@@ -34,7 +34,7 @@ endif
 ```
 
 do !i from 1 to 5
-$P !i
+    $P !i
 enddo
 
 ```
