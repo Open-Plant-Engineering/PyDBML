@@ -106,194 +106,64 @@ class ASTEvaluator:
             self._trace(node)
 
             if isinstance(node, PrintNode):
-                value = self.evaluate(node.expr)
-                val = value.value if hasattr(value, "value") else value
-                print(val)
-                return value
+                return self._eval_print(node)
 
             if isinstance(node, GoLabelNode):
-                raise GoLabelSignal(node.name)
+                return self._eval_go_label(node)
+
             if isinstance(node, LabelNode):
-                return None
+                return self._eval_label(node)
 
             if callable(node):
                 return node()
 
             if isinstance(node, HandleNode):
-            
-                try:
-                    result = None
-
-                    for stmt in node.try_block:
-                        result = self.evaluate(stmt)
-
-                    # ✅ success case
-                    if node.else_block:
-                        for stmt in node.else_block:
-                            result = self.evaluate(stmt)
-
-                    return result
-
-                except PyDBMLError as e:
-                
-                    for condition, block in node.handlers:
-                    
-                        # ✅ HANDLE ANY
-                        if condition == "ANY":
-                            for stmt in block:
-                                self.evaluate(stmt)
-                            return None
-
-                        # ✅ HANDLE (code1, code2) or (code1,)
-                        if isinstance(condition, tuple):
-                        
-                            # ✅ SINGLE CODE MATCH (code1, None)
-                            if len(condition) == 2 and condition[1] is None:
-                                if e.code1 == condition[0]:
-                                    for stmt in block:
-                                        self.evaluate(stmt)
-                                    return None
-
-                            # ✅ EXACT MATCH (code1, code2)
-                            elif len(condition) == 2:
-                                if (e.code1, e.code2) == condition:
-                                    for stmt in block:
-                                        self.evaluate(stmt)
-                                    return None
-
-                    raise
+                return self._eval_handle(node)
                 
             if isinstance(node, ImportNode):
-                return self.eval_import(node)
+                return self._eval_import(node)
 
             if isinstance(node, SkipIfNode):
-            
-                # ✅ standalone skip
-                if node.condition is None:
-                    raise ContinueSignal()
-
-                # ✅ conditional skip
-                condition = self.evaluate(node.condition)
-                if condition.value:
-                    raise ContinueSignal()
-                return None
+                return self._eval_skip_if(node)
 
             if isinstance(node, list):
-                result = None
-                for stmt in node:
-                    result = self.evaluate(stmt)
-                return result
+                return self._eval_block(node)
 
             if isinstance(node, DoNode):
                 return self._eval_do(node)
 
             if isinstance(node, BreakIfNode):
-                condition = self.evaluate(node.condition)
-                if condition.value:
-                    raise BreakSignal()
-                return None
+                return self._eval_break_if(node)
 
             if isinstance(node, BreakNode):
-                raise BreakSignal()
+                return self._eval_break(node)
 
             if isinstance(node, PipeStringNode):
                 return self._eval_pipe_string(node)
 
             if isinstance(node, CommandVarNode):
-                if node.is_global:
-                    value = self.env.get_global(node.name).get()
-                else:
-                    value = self.env.get(node.name).get()
-                debug("COMMAND VAR", f"{node.name} → {value} (global={node.is_global})")
-                return value
+                return self._eval_command_var(node)
 
             if isinstance(node, ObjectNode):
-            
-                # ✅ PLUGIN HOOK
-                type_name = node.type_name.lower()
-
-                # --------------------------
-                # ✅ 1. Plugin classes
-                # --------------------------
-                if type_name in self.registry.classes:
-                    py_class = self.registry.classes[type_name]
-                    args = [self._to_python(self.evaluate(arg)) for arg in node.args]
-                    instance = py_class(*args)
-                    return instance
-
-                # --------------------------
-                # ✅ 2. Built-in array
-                # --------------------------
-                if type_name == "array":
-                    return Array()
-
-                # --------------------------
-                # ✅ 3. NEW: In-memory object definitions ✅
-                # --------------------------
-                if hasattr(self, "object_defs") and type_name in self.object_defs:
-                    obj_def = self.object_defs[type_name]
-                    instance = ObjectInstance(obj_def)
-                    args = [self.evaluate(arg) for arg in node.args]
-                    self._construct_object(instance, obj_def, type_name, args, node)
-                    return instance
-
-                # --------------------------
-                # ✅ 4. Existing file loader (unchanged)
-                # --------------------------
-                if type_name != "object":
-                    loader = ObjectLoader(self.resolver)
-                    obj_def = loader.load(type_name)
-                    instance = ObjectInstance(obj_def)
-                    args = [self.evaluate(arg) for arg in node.args]
-                    self._construct_object(instance, obj_def, type_name, args, node)
-                    return instance
+                return self._eval_object(node)
 
             if isinstance(node, ReturnNode):
-                value = self.evaluate(node.value)
-                # special signal for return
-                raise ReturnSignal(value)
+                return self._eval_return(node)
 
             # --------------------------
             # Object Definition
             # --------------------------
             if isinstance(node, ObjectDefNode):
-                name = node.name.lower()
-                # ✅ store object definition
-                if not hasattr(self, "object_defs"):
-                    self.object_defs = {}
-                self.object_defs[name] = node
-                return None
+                return self._eval_object_def(node)
 
             # --------------------------
             # Method Definition
             # --------------------------
             if isinstance(node, MethodDefNode):
-            
-                # ✅ ensure object storage exists
-                if not hasattr(self, "object_defs"):
-                    self.object_defs = {}
-
-                method_name = node.name.lower()
-
-                # ✅ attach to ALL objects that match method name (simple rule)
-                for obj_name, obj_def in self.object_defs.items():
-                
-                    # ✅ initialize method dict if missing
-                    if not hasattr(obj_def, "methods") or obj_def.methods is None:
-                        obj_def.methods = {}
-
-                    if method_name not in obj_def.methods:
-                        obj_def.methods[method_name] = []
-
-                    obj_def.methods[method_name].append(node)
-
-                return None
+                return self._eval_method_def(node)
 
             if isinstance(node, FunctionDefNode):
-                name = node.name.lower()
-                # ✅ store function definition
-                self.registry.functions[name] = node
-                return None
+                return self._eval_function_def(node)
 
             if isinstance(node, FunctionCallNode):
                 return self._eval_function_call(node)
@@ -409,6 +279,239 @@ class ASTEvaluator:
         finally:
             if self.call_stack:
                 self.call_stack.pop()
+
+    def _eval_block(self, node_list):
+        result = None
+        for stmt in node_list:
+            result = self.evaluate(stmt)
+        return result
+
+    def _eval_function_def(self, node):
+        name = node.name.lower()
+        self.registry.functions[name] = node
+        return None
+
+    def _eval_command_var(self, node):
+        if node.is_global:
+            value = self.env.get_global(node.name).get()
+        else:
+            value = self.env.get(node.name).get()
+
+        debug("COMMAND VAR", f"{node.name} → {value} (global={node.is_global})")
+        return value
+
+    def _eval_print(self, node):
+        value = self.evaluate(node.expr)
+        val = value.value if hasattr(value, "value") else value
+        print(val)
+        return value
+
+    def _eval_go_label(self, node):
+        raise GoLabelSignal(node.name)
+
+    def _eval_label(self, node):
+        return None
+
+    def _eval_handle(self, node):
+        """
+        Handle TRY / HANDLE / ELSE construct.
+        """
+
+        try:
+            result = None
+
+            for stmt in node.try_block:
+                result = self.evaluate(stmt)
+
+            # ✅ success case
+            if node.else_block:
+                for stmt in node.else_block:
+                    result = self.evaluate(stmt)
+
+            return result
+
+        except PyDBMLError as e:
+
+            for condition, block in node.handlers:
+
+                # ✅ HANDLE ANY
+                if condition == "ANY":
+                    for stmt in block:
+                        self.evaluate(stmt)
+                    return None
+
+                # ✅ HANDLE (code1, code2) or (code1,)
+                if isinstance(condition, tuple):
+
+                    # ✅ SINGLE CODE MATCH
+                    if len(condition) == 2 and condition[1] is None:
+                        if e.code1 == condition[0]:
+                            for stmt in block:
+                                self.evaluate(stmt)
+                            return None
+
+                    # ✅ EXACT MATCH
+                    elif len(condition) == 2:
+                        if (e.code1, e.code2) == condition:
+                            for stmt in block:
+                                self.evaluate(stmt)
+                            return None
+
+            # ❗ IMPORTANT: rethrow if not handled
+            raise
+
+    def _eval_return(self, node):
+        """Handle return statement."""
+        value = self.evaluate(node.value)
+        raise ReturnSignal(value)
+
+    def _eval_break(self, node):
+        """Handle break statement."""
+        raise BreakSignal()
+
+    def _eval_break_if(self, node):
+        """Handle conditional break."""
+        condition = self.evaluate(node.condition)
+
+        if condition.value:
+            raise BreakSignal()
+
+        return None
+
+    def _eval_skip_if(self, node):
+        """Handle skip / continue logic."""
+
+        # standalone skip
+        if node.condition is None:
+            raise ContinueSignal()
+
+        # conditional skip
+        condition = self.evaluate(node.condition)
+
+        if condition.value:
+            raise ContinueSignal()
+
+        return None
+
+    def _eval_object(self, node):
+        """
+        Create object instance.
+
+        Supports:
+        - plugin classes
+        - built-in array
+        - in-memory definitions
+        - file-loaded objects
+        """
+
+        type_name = node.type_name.lower()
+
+        # ✅ plugin classes
+        if type_name in self.registry.classes:
+            py_class = self.registry.classes[type_name]
+            args = [self._to_python(self.evaluate(arg)) for arg in node.args]
+            return py_class(*args)
+
+        # ✅ built-in array
+        if type_name == "array":
+            return Array()
+
+        # ✅ in-memory object
+        if hasattr(self, "object_defs") and type_name in self.object_defs:
+            obj_def = self.object_defs[type_name]
+            instance = ObjectInstance(obj_def)
+
+            args = [self.evaluate(arg) for arg in node.args]
+            self._construct_object(instance, obj_def, type_name, args, node)
+
+            return instance
+
+        # ✅ file-loaded object
+        if type_name != "object":
+            loader = ObjectLoader(self.resolver)
+            obj_def = loader.load(type_name)
+
+            instance = ObjectInstance(obj_def)
+
+            args = [self.evaluate(arg) for arg in node.args]
+            self._construct_object(instance, obj_def, type_name, args, node)
+
+            return instance
+
+    def _eval_object_def(self, node):
+        """Store object definition."""
+
+        name = node.name.lower()
+
+        if not hasattr(self, "object_defs"):
+            self.object_defs = {}
+
+        self.object_defs[name] = node
+        return None
+
+    def _eval_method_def(self, node):
+        """Attach method to object definitions."""
+
+        if not hasattr(self, "object_defs"):
+            self.object_defs = {}
+
+        method_name = node.name.lower()
+
+        for obj_def in self.object_defs.values():
+
+            if not hasattr(obj_def, "methods") or obj_def.methods is None:
+                obj_def.methods = {}
+
+            obj_def.methods.setdefault(method_name, []).append(node)
+
+        return None
+
+
+
+    def _eval_index_access(self, node):
+        """Access array/list element."""
+
+        array_obj = self.evaluate(node.target)
+        index_val = self.evaluate(node.index)
+
+        if not isinstance(index_val, Real):
+            raise raise_error(
+                "INDEX_ERROR",
+                "Index must be numeric",
+                node=node
+            )
+
+        index = int(index_val.value)
+
+        # Python list fallback
+        if isinstance(array_obj, list):
+            return self._to_pydbml(array_obj[index - 1])
+
+        try:
+            return array_obj.get(index)
+        except Exception:
+            raise raise_error("INDEX_ERROR", f"{index}", node=node)
+
+    def _eval_index_assign(self, node):
+        """Assign value to array index."""
+
+        target_obj = self.evaluate(node.target)
+        index = int(self.evaluate(node.index).value)
+        value = self.evaluate(node.value)
+
+        debug("INDEX ASSIGN", f"{index} = {value}")
+
+        try:
+            target_obj.set(index, value)
+        except Exception:
+            raise raise_error(
+                "INDEX_ERROR",
+                f"Invalid index {index}",
+                node=node
+            )
+
+        return value
+
 
     def _eval_binary(self, node):
         """
@@ -593,7 +696,7 @@ class ASTEvaluator:
         finally:
             self.env.pop_scope()
 
-    def eval_import(self, node):
+    def _eval_import(self, node):
         path = node.path
 
         # ✅ file path
@@ -1482,54 +1585,6 @@ class ASTEvaluator:
             "Dot assignment not supported",
             node=node
         )
-
-    def _eval_index_access(self, node):
-        array_obj = self.evaluate(node.target)
-
-        index_val = self.evaluate(node.index)
-
-        if not isinstance(index_val, Real):
-            raise raise_error(
-                "INDEX_ERROR",
-                "Index must be numeric",
-                node=node
-            )
-
-        index = int(index_val.value)
-
-        # ✅ Python list fallback
-        if isinstance(array_obj, list):
-            return self._to_pydbml(array_obj[index - 1])
-
-        try:
-            return array_obj.get(index)
-        except Exception:
-            raise raise_error(
-                "INDEX_ERROR",
-                f"{index}",
-                node=node
-            )
-
-    def _eval_index_assign(self, node):
-        debug("INDEX ASSIGN NODE", node)
-
-        target_obj = self.evaluate(node.target)
-        index_val = self.evaluate(node.index).value
-        value = self.evaluate(node.value)
-
-        debug("INDEX VALUE", index_val)
-        debug("VALUE TO SET", value)
-
-        try:
-            target_obj.set(int(index_val), value)
-        except Exception:
-            raise raise_error(
-                "INDEX_ERROR",
-                f"Invalid index {index_val}",
-                node=node
-            )
-
-        return value
 
     def _eval_pipe_string(self, node):
         text = node.raw
