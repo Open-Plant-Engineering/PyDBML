@@ -1314,7 +1314,9 @@ class ASTEvaluator:
     def _eval_method_call(self, node):
         method_name = node.method.lower()
 
-        # ✅ BUILTIN FIRST (IMPORTANT FIX)
+        # --------------------------
+        # ✅ BUILIN FIRST
+        # --------------------------
         builtin = self.builtins.get(method_name)
 
         if builtin:
@@ -1325,23 +1327,24 @@ class ASTEvaluator:
                 if use_raw:
                     args = [node.target] + node.args
                 else:
-                    # ✅ IMPORTANT: include evaluated target
                     evaluated_target = self.evaluate(node.target)
                     args = [evaluated_target] + [self.evaluate(arg) for arg in node.args]
 
                 return builtin(self, args, node)
 
-        # ✅ SAFE TO EVALUATE AFTER
+        # --------------------------
+        # ✅ EVALUATE TARGET
+        # --------------------------
         target = self.evaluate(node.target)
 
-        # ✅ ✅ CRITICAL FIX: unwrap PluginObject
+        # ✅ unwrap PluginObject
         if isinstance(target, PluginObject):
             target = target.obj
 
         args = [self.evaluate(arg) for arg in node.args]
 
         # --------------------------
-        # ✅ Case 1: Object method (DSL object)
+        # ✅ Case 1: DSL Object
         # --------------------------
         if isinstance(target, ObjectInstance):
 
@@ -1363,7 +1366,7 @@ class ASTEvaluator:
                 )
 
         # --------------------------
-        # ✅ Case 2: Plugin / Python methods
+        # ✅ Case 2: Plugin/Extension Methods
         # --------------------------
         cls = target.__class__
 
@@ -1377,21 +1380,30 @@ class ASTEvaluator:
             method = method_map[method_name_upper].__get__(target, cls)
 
             py_args = [self._to_python(a) for a in args]
-
             result = method(*py_args)
 
             return self._to_pydbml(result)
 
         # --------------------------
-        # ✅ NEW: Native Python method fallback (FINAL FIX)
+        # ✅ Case 3: Native Python methods (FULL FIX ✅)
         # --------------------------
+        method = None
+
+        # ✅ exact match (fast)
         if hasattr(target, method_name):
             method = getattr(target, method_name)
 
-            if callable(method):
-                py_args = [self._to_python(a) for a in args]
-                result = method(*py_args)
-                return self._to_pydbml(result)
+        else:
+            # ✅ case-insensitive fallback
+            for attr in dir(target):
+                if attr.lower() == method_name:
+                    method = getattr(target, attr)
+                    break
+
+        if method and callable(method):
+            py_args = [self._to_python(a) for a in args]
+            result = method(*py_args)
+            return self._to_pydbml(result)
 
         # --------------------------
         # ❌ Not found
