@@ -410,6 +410,52 @@ class ASTEvaluator:
             if self.call_stack:
                 self.call_stack.pop()
 
+    def _eval_binary(self, node):
+        """
+        Evaluate binary operator using operator overloading system.
+        """
+
+        left = self.evaluate(node.left)
+
+        # ✅ Short circuit (logic already handled above, but kept here for safety)
+        if node.op == "AND" and not left.value:
+            return Boolean(False)
+
+        if node.op == "OR" and left.value:
+            return Boolean(True)
+
+        right = self.evaluate(node.right)
+
+        # ✅ unwrap plugin objects
+        left_val = left.obj if isinstance(left, PluginObject) else left
+        right_val = right.obj if isinstance(right, PluginObject) else right
+
+        debug("BINOP LEFT", left_val)
+        debug("BINOP RIGHT", right_val)
+        debug("BINOP OP", node.op)
+
+        cls = left_val.__class__
+
+        # ✅ build cache only once
+        if cls not in self._operator_cache:
+            self._build_cache(cls)
+
+        operator_map = self._operator_cache[cls]
+
+        if node.op in operator_map:
+            method = operator_map[node.op].__get__(left_val, cls)
+
+            py_right = self._to_python(right_val)
+            result = method(py_right)
+
+            return self._to_pydbml(result)
+
+        raise raise_error(
+            "OPERATOR_ERROR",
+            f"{node.op} not supported for {type(left_val).__name__}",
+            node=node
+        )
+
     def _eval_not(self, node):
         """
         Evaluate NOT operator.
@@ -1141,49 +1187,6 @@ class ASTEvaluator:
             return result
 
         return None
-
-    def _eval_binary(self, node):
-        left = self.evaluate(node.left)
-        
-        if node.op == "AND" and not left.value:
-            return Boolean(False)
-
-        if node.op == "OR" and left.value:
-            return Boolean(True)
-
-        right = self.evaluate(node.right)
-
-        # ✅ unwrap plugin objects
-        if isinstance(left, PluginObject):
-            left = left.obj
-
-        if isinstance(right, PluginObject):
-            right = right.obj
-
-        debug("BINOP LEFT", left)
-        debug("BINOP RIGHT", right)
-        debug("BINOP OP", node.op)
-
-        # ✅ get class
-        cls = left.__class__
-
-        # ✅ build cache only once
-        if cls not in self._operator_cache:
-            self._build_cache(cls)
-
-        operator_map = self._operator_cache[cls]
-
-        if node.op in operator_map:
-            method = operator_map[node.op].__get__(left, cls)
-            py_right = self._to_python(right)
-            result = method(py_right)
-            return self._to_pydbml(result)
-
-        raise raise_error(
-            "OPERATOR_ERROR",
-            f"{node.op} not supported for {type(left).__name__}",
-            node=node
-        )
 
     def _eval_function_call(self, node):
         name = node.name.lower()
