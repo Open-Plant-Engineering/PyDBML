@@ -52,6 +52,9 @@ from pydbml.runtime.plugin_registry import PluginRegistry
 from pydbml.runtime.exceptions import PyDBMLError
 from pydbml.runtime.error_codes import raise_error
 from pydbml.debugger.debug_controller import DebugController
+from pydbml.builtins.iftrue import builtin_iftrue
+from pydbml.builtins.undefined import builtin_undefined
+from pydbml.runtime.builtins import BuiltinRegistry
 
 class ASTEvaluator:
     def __init__(self, env, resolver=None):
@@ -73,6 +76,22 @@ class ASTEvaluator:
         self.watch_vars = set()
         self.debug_controller = DebugController()
         self.interactive_mode = True
+        self.builtins = BuiltinRegistry()
+
+        self.builtins.register("iftrue", builtin_iftrue)
+        self.builtins.register("undefined", builtin_undefined)
+
+    # --------------------------
+    # ✅ Builtin Registration
+    # --------------------------
+    def register_builtin(self, name, func):
+        """
+        Allow users to register custom builtins.
+
+        func signature:
+            func(evaluator, args, node)
+        """
+        self.builtins.register(name, func)
 
     def evaluate(self, node):
         try:
@@ -1122,26 +1141,17 @@ class ASTEvaluator:
     def _eval_function_call(self, node):
         name = node.name.lower()
 
-        if name == "iftrue":
-            if len(node.args) != 3:
-                raise raise_error(
-                    "ARG_COUNT",
-                    "iftrue expects 3 arguments",
-                    node=node
-                )
+        # ✅ BUILTIN DISPATCH
+        builtin = self.builtins.get(name)
+        if builtin:
+            use_raw = getattr(builtin, "_raw_args", False)
 
-            cond = self.evaluate(node.args[0])
+            if use_raw:
+                args = node.args            # raw AST nodes
+            else:
+                args = [self.evaluate(arg) for arg in node.args]           # evaluated later inside builtin
 
-            if not isinstance(cond, Boolean):
-                raise raise_error(
-                    "TYPE_ERROR",
-                    "iftrue condition must be BOOLEAN",
-                    node=node
-                )
-
-            return self.evaluate(
-                node.args[1] if cond.value else node.args[2]
-            )
+            return builtin(self, args, node)
 
         # --------------------------
         # ✅ REGISTERED FUNCTIONS
@@ -1244,9 +1254,28 @@ class ASTEvaluator:
             self.env.pop_scope()
 
     def _eval_method_call(self, node):
+        method_name = node.method.lower()
+
+        # ✅ BUILTIN FIRST (IMPORTANT FIX)
+        builtin = self.builtins.get(method_name)
+
+        if builtin:
+            allow_method = getattr(builtin, "_allow_method", True)
+            if allow_method:
+                use_raw = getattr(builtin, "_raw_args", False)
+
+                if use_raw:
+                    # ✅ raw mode → pass AST
+                    args = [node.target] + node.args
+                else:
+                    # ✅ normal mode → evaluate arguments
+                    args = [self.evaluate(arg) for arg in node.args]
+
+                return builtin(self, args, node)
+
+        # ✅ SAFE TO EVALUATE AFTER
         target = self.evaluate(node.target)
         args = [self.evaluate(arg) for arg in node.args]
-        method_name = node.method.lower()
 
         # --------------------------
         # ✅ Case 1: Object method (DSL object)
