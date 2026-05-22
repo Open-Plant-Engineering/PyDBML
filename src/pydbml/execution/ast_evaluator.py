@@ -329,49 +329,13 @@ class ASTEvaluator:
             # NOT
             # --------------------------
             if isinstance(node, NotNode):
-                value = self.evaluate(node.operand)
-
-                debug("NOT VALUE", value)
-
-                if not isinstance(value, Boolean):
-                    raise raise_error(
-                        "TYPE_ERROR",
-                        "NOT requires BOOLEAN value",
-                        node=node
-                    )
-
-                return Boolean(not value.value)
+                return self._eval_not(node)
 
             # --------------------------
             # Logical AND / OR
             # --------------------------
             if isinstance(node, LogicalOpNode):
-                left = self.evaluate(node.left)
-                
-                if node.op == "AND" and not left.value:
-                    return Boolean(False)
-                
-                if node.op == "OR" and left.value:
-                    return Boolean(True)
-                
-                right = self.evaluate(node.right)
-
-                debug("LOGICAL LEFT", left)
-                debug("LOGICAL RIGHT", right)
-                debug("OPERATOR", node.op)
-
-                if not isinstance(left, Boolean) or not isinstance(right, Boolean):
-                    raise raise_error(
-                        "TYPE_ERROR",
-                        "Logical operations require BOOLEAN values",
-                        node=node
-                    )
-
-                if node.op == "AND":
-                    return Boolean(left.value and right.value)
-
-                if node.op == "OR":
-                    return Boolean(left.value or right.value)
+                return self._eval_logical(node)
 
             # --------------------------
             # IF Node
@@ -445,6 +409,56 @@ class ASTEvaluator:
         finally:
             if self.call_stack:
                 self.call_stack.pop()
+
+    def _eval_not(self, node):
+        """
+        Evaluate NOT operator.
+        """
+
+        value = self.evaluate(node.operand)
+
+        debug("NOT VALUE", value)
+
+        if not isinstance(value, Boolean):
+            raise raise_error(
+                "TYPE_ERROR",
+                "NOT requires BOOLEAN value",
+                node=node
+            )
+
+        return Boolean(not value.value)
+
+    def _eval_logical(self, node):
+        """
+        Evaluate logical AND / OR with short-circuit.
+        """
+
+        left = self.evaluate(node.left)
+
+        # ✅ short circuit
+        if node.op == "AND" and not left.value:
+            return Boolean(False)
+
+        if node.op == "OR" and left.value:
+            return Boolean(True)
+
+        right = self.evaluate(node.right)
+
+        debug("LOGICAL LEFT", left)
+        debug("LOGICAL RIGHT", right)
+        debug("OPERATOR", node.op)
+
+        if not isinstance(left, Boolean) or not isinstance(right, Boolean):
+            raise raise_error(
+                "TYPE_ERROR",
+                "Logical operations require BOOLEAN values",
+                node=node
+            )
+
+        if node.op == "AND":
+            return Boolean(left.value and right.value)
+
+        return Boolean(left.value or right.value)
 
     def _eval_number(self, node):
         """Return numeric literal."""
