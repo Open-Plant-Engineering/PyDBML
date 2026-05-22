@@ -1,4 +1,5 @@
 import re
+import types
 from pydbml.types.real import Real
 from pydbml.types.string import String
 from pydbml.types.boolean import Boolean
@@ -83,7 +84,40 @@ class ASTEvaluator:
         self.builtins.register("iftrue", builtin_iftrue)
         self.builtins.register("undefined", builtin_undefined)
         self.builtins.register("unset", builtin_unset)
-
+        self._dispatch = {
+            PrintNode: self._eval_print,
+            GoLabelNode: self._eval_go_label,
+            LabelNode: self._eval_label,
+            HandleNode: self._eval_handle,
+            ImportNode: self._eval_import,
+            SkipIfNode: self._eval_skip_if,
+            list: self._eval_block,
+            DoNode: self._eval_do,
+            BreakIfNode: self._eval_break_if,
+            BreakNode: self._eval_break,
+            PipeStringNode: self._eval_pipe_string,
+            CommandVarNode: self._eval_command_var,
+            ObjectNode: self._eval_object,
+            ReturnNode: self._eval_return,
+            ObjectDefNode: self._eval_object_def,
+            MethodDefNode: self._eval_method_def,
+            FunctionDefNode: self._eval_function_def,
+            FunctionCallNode: self._eval_function_call,
+            CallNode: self._eval_method_call,
+            DotAccessNode: self._eval_dot_access,
+            DotAssignNode: self._eval_dot_assign,
+            IndexAssignNode: self._eval_index_assign,
+            IndexAccessNode: self._eval_index_access,
+            NotNode: self._eval_not,
+            LogicalOpNode: self._eval_logical,
+            IfNode: self._eval_if,
+            AssignNode: self._eval_assign,
+            NumberNode: self._eval_number,
+            StringNode: self._eval_string,
+            BooleanNode: self._eval_boolean,
+            VariableNode: self._eval_variable,
+            BinaryOpNode: self._eval_binary,
+        }
     # --------------------------
     # ✅ Builtin Registration
     # --------------------------
@@ -100,149 +134,32 @@ class ASTEvaluator:
         try:
             if node is None:
                 return None
-            
+
             debug("NODE START", node)
             self.call_stack.append(node)
             self._trace(node)
 
-            if isinstance(node, PrintNode):
-                return self._eval_print(node)
-
-            if isinstance(node, GoLabelNode):
-                return self._eval_go_label(node)
-
-            if isinstance(node, LabelNode):
-                return self._eval_label(node)
-
-            if callable(node):
+            # ✅ allow raw Python functions (tests, hooks)
+            import types
+            if isinstance(node, types.FunctionType):
                 return node()
 
-            if isinstance(node, HandleNode):
-                return self._eval_handle(node)
-                
-            if isinstance(node, ImportNode):
-                return self._eval_import(node)
-
-            if isinstance(node, SkipIfNode):
-                return self._eval_skip_if(node)
-
-            if isinstance(node, list):
-                return self._eval_block(node)
-
-            if isinstance(node, DoNode):
-                return self._eval_do(node)
-
-            if isinstance(node, BreakIfNode):
-                return self._eval_break_if(node)
-
-            if isinstance(node, BreakNode):
-                return self._eval_break(node)
-
-            if isinstance(node, PipeStringNode):
-                return self._eval_pipe_string(node)
-
-            if isinstance(node, CommandVarNode):
-                return self._eval_command_var(node)
-
-            if isinstance(node, ObjectNode):
-                return self._eval_object(node)
-
-            if isinstance(node, ReturnNode):
-                return self._eval_return(node)
-
-            # --------------------------
-            # Object Definition
-            # --------------------------
-            if isinstance(node, ObjectDefNode):
-                return self._eval_object_def(node)
-
-            # --------------------------
-            # Method Definition
-            # --------------------------
-            if isinstance(node, MethodDefNode):
-                return self._eval_method_def(node)
-
-            if isinstance(node, FunctionDefNode):
-                return self._eval_function_def(node)
-
-            if isinstance(node, FunctionCallNode):
-                return self._eval_function_call(node)
-
-            if isinstance(node, CallNode):
-                return self._eval_method_call(node)
-
-            # --------------------------
-            # DOT ACCESS
-            # --------------------------
-            if isinstance(node, DotAccessNode):
-                return self._eval_dot_access(node)
-
-            # --------------------------
-            # DOT ASSIGN
-            # --------------------------
-            if isinstance(node, DotAssignNode):
-                return self._eval_dot_assign(node)
-
-            # --------------------------
-            # Index Assignment
-            # --------------------------
-            if isinstance(node, IndexAssignNode):
-                return self._eval_index_assign(node)
-
-            # --------------------------
-            # Index Access
-            # --------------------------
-            if isinstance(node, IndexAccessNode):
-                return self._eval_index_access(node)
-
-            # --------------------------
-            # NOT
-            # --------------------------
-            if isinstance(node, NotNode):
-                return self._eval_not(node)
-
-            # --------------------------
-            # Logical AND / OR
-            # --------------------------
-            if isinstance(node, LogicalOpNode):
-                return self._eval_logical(node)
-
-            # --------------------------
-            # IF Node
-            # --------------------------
-            if isinstance(node, IfNode):
-                return self._eval_if(node)
-                
-            # --------------------------
-            # Assignment
-            # --------------------------
-            if isinstance(node, AssignNode):
-                return self._eval_assign(node)
-
-            if isinstance(node, NumberNode):
-                return self._eval_number(node)
-
-            if isinstance(node, StringNode):
-                return self._eval_string(node)
-
-            if isinstance(node, BooleanNode):
-                return self._eval_boolean(node)
-
-            # ✅ NULL literal support
+            # ✅ special-case NULL
             if isinstance(node, VariableNode) and node.name.lower() == "null":
                 return UNSET
 
-            # --------------------------
-            # Variable
-            # --------------------------
-            if isinstance(node, VariableNode):
-                return self._eval_variable(node)
+            # ✅ dispatch lookup
+            handler = self._dispatch.get(type(node))
 
-            # --------------------------
-            # Binary Operation
-            # --------------------------
-            if isinstance(node, BinaryOpNode):
-                return self._eval_binary(node)
+            if handler:
+                return handler(node)
+
+            raise raise_error(
+                "INTERNAL",
+                f"Unhandled node type: {type(node).__name__}",
+                node=node,
+                stack=self.call_stack.copy()
+            )
 
         except Exception as e:
             # ✅ control flow → never touch
@@ -336,9 +253,10 @@ class ASTEvaluator:
 
                 # ✅ HANDLE ANY
                 if condition == "ANY":
+                    result = None
                     for stmt in block:
-                        self.evaluate(stmt)
-                    return None
+                        result = self.evaluate(stmt)
+                    return result
 
                 # ✅ HANDLE (code1, code2) or (code1,)
                 if isinstance(condition, tuple):
@@ -346,18 +264,19 @@ class ASTEvaluator:
                     # ✅ SINGLE CODE MATCH
                     if len(condition) == 2 and condition[1] is None:
                         if e.code1 == condition[0]:
+                            result = None
                             for stmt in block:
-                                self.evaluate(stmt)
-                            return None
+                                result = self.evaluate(stmt)
+                            return result
 
                     # ✅ EXACT MATCH
                     elif len(condition) == 2:
                         if (e.code1, e.code2) == condition:
+                            result = None
                             for stmt in block:
-                                self.evaluate(stmt)
-                            return None
+                                result = self.evaluate(stmt)
+                            return result
 
-            # ❗ IMPORTANT: rethrow if not handled
             raise
 
     def _eval_return(self, node):
@@ -406,17 +325,14 @@ class ASTEvaluator:
 
         type_name = node.type_name.lower()
 
-        # ✅ plugin classes
         if type_name in self.registry.classes:
             py_class = self.registry.classes[type_name]
             args = [self._to_python(self.evaluate(arg)) for arg in node.args]
             return py_class(*args)
 
-        # ✅ built-in array
         if type_name == "array":
             return Array()
 
-        # ✅ in-memory object
         if hasattr(self, "object_defs") and type_name in self.object_defs:
             obj_def = self.object_defs[type_name]
             instance = ObjectInstance(obj_def)
@@ -426,7 +342,6 @@ class ASTEvaluator:
 
             return instance
 
-        # ✅ file-loaded object
         if type_name != "object":
             loader = ObjectLoader(self.resolver)
             obj_def = loader.load(type_name)
@@ -438,6 +353,12 @@ class ASTEvaluator:
 
             return instance
 
+        # ✅ NEW: explicit failure
+        raise raise_error(
+            "TYPE_ERROR",
+            f"Unknown object type: {type_name}",
+            node=node
+        )
     def _eval_object_def(self, node):
         """Store object definition."""
 
@@ -462,11 +383,12 @@ class ASTEvaluator:
             if not hasattr(obj_def, "methods") or obj_def.methods is None:
                 obj_def.methods = {}
 
-            obj_def.methods.setdefault(method_name, []).append(node)
+            if method_name not in obj_def.methods:
+                obj_def.methods[method_name] = []
+
+            obj_def.methods[method_name].append(node)
 
         return None
-
-
 
     def _eval_index_access(self, node):
         """Access array/list element."""
