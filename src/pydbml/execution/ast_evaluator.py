@@ -383,34 +383,16 @@ class ASTEvaluator:
             # Assignment
             # --------------------------
             if isinstance(node, AssignNode):
-                value = self.evaluate(node.value)
+                return self._eval_assign(node)
 
-                debug("ASSIGN", f"{node.name} = {value}")
-
-                self.env.set(node.name, value, node.is_global)
-
-                # ✅ TRACK VARIABLE FOR DEBUGGER
-                self._debug_vars.add(node.name)
-
-                return f"{node.name} set"
-
-            # --------------------------
-            # Number
-            # --------------------------
             if isinstance(node, NumberNode):
-                return Real(node.value)
+                return self._eval_number(node)
 
-            # --------------------------
-            # String
-            # --------------------------
             if isinstance(node, StringNode):
-                return String(node.value)
+                return self._eval_string(node)
 
-            # --------------------------
-            # Boolean
-            # --------------------------
             if isinstance(node, BooleanNode):
-                return Boolean(node.value)
+                return self._eval_boolean(node)
 
             # ✅ NULL literal support
             if isinstance(node, VariableNode) and node.name.lower() == "null":
@@ -420,21 +402,7 @@ class ASTEvaluator:
             # Variable
             # --------------------------
             if isinstance(node, VariableNode):
-                try:
-                    if node.is_global:
-                        value = self.env.get_global(node.name).get()
-                    else:
-                        value = self.env.get(node.name).get()
-                except KeyError:
-                    raise raise_error(
-                            "NAME_ERROR",
-                            f"Variable '{node.name}' is not defined",
-                            node=node,
-                            stack=self.call_stack
-                        )
-
-                debug("VARIABLE RESOLVE", f"{node.name} → {value}")
-                return value
+                return self._eval_variable(node)
 
             # --------------------------
             # Binary Operation
@@ -477,6 +445,60 @@ class ASTEvaluator:
         finally:
             if self.call_stack:
                 self.call_stack.pop()
+
+    def _eval_number(self, node):
+        """Return numeric literal."""
+        return Real(node.value)
+
+    def _eval_string(self, node):
+        """Return string literal."""
+        return String(node.value)
+
+    def _eval_boolean(self, node):
+        """Return boolean literal."""
+        return Boolean(node.value)
+
+    def _eval_variable(self, node):
+        """
+        Resolve variable from environment.
+        Handles NULL → UNSET.
+        """
+
+        if node.name.lower() == "null":
+            return UNSET
+
+        try:
+            if node.is_global:
+                value = self.env.get_global(node.name).get()
+            else:
+                value = self.env.get(node.name).get()
+
+        except KeyError:
+            raise raise_error(
+                "NAME_ERROR",
+                f"Variable '{node.name}' is not defined",
+                node=node,
+                stack=self.call_stack
+            )
+
+        debug("VARIABLE RESOLVE", f"{node.name} → {value}")
+        return value
+
+    def _eval_assign(self, node):
+        """Assign value to variable."""
+
+        value = self.evaluate(node.value)
+
+        debug("ASSIGN", f"{node.name} = {value}")
+
+        self.env.set(node.name, value, node.is_global)
+
+        # debugger tracking
+        self._debug_vars.add(node.name)
+
+        return f"{node.name} set"
+
+
 
     def _execute_method(self, instance, method_node, args):
 
