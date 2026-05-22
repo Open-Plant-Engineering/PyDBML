@@ -151,14 +151,46 @@ class Parser:
         # ✅ IMPORT handling
         # --------------------------
         if self._match("IMPORT"):
-            self._consume()
-
+            import_token = self._consume()
+        
+            # ✅ NEW: import module <name>
+            if self._peek() and self._peek().value.lower() == "module":
+                self._consume()
+        
+                token = self._consume()
+        
+                if token.type == "IDENTIFIER":
+                    name = token.value
+        
+                elif token.type == "STRING_PIPE":
+                    name = token.value[1:-1]
+        
+                else:
+                    raise raise_error(
+                        "SYNTAX_ERROR",
+                        "Expected module name after 'import module'",
+                        node=self._wrap_token(token)
+                    )
+        
+                return self._attach_handle(
+                    ImportNode(name, is_module=True, token=import_token)
+                )
+        
+            # ✅ EXISTING: import |file|
             token = self._consume()
+        
             if token.type != "STRING_PIPE":
-                raise SyntaxError("Expected |module_or_path|")
-
+                raise raise_error(
+                    "SYNTAX_ERROR",
+                    "Expected |module_or_path| or 'module <name>'",
+                    node=self._wrap_token(token)
+                )
+        
             raw = token.value[1:-1]
-            return self._attach_handle(ImportNode(raw))
+        
+            return self._attach_handle(
+                ImportNode(raw, is_module=False, token=import_token)
+            )
         
         # --------------------------
         # ✅ SKIP handling

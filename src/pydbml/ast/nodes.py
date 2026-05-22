@@ -248,9 +248,10 @@ class SkipIfNode(ASTNode):
         self.condition = condition
 
 class ImportNode(ASTNode):
-    def __init__(self, path, token=None):
+    def __init__(self, path, is_module=False, token=None):
         super().__init__(token)
         self.path = path
+        self.is_module = is_module
 
 class HandleNode(ASTNode):
     def __init__(self, try_block, handlers=None, else_block=None, token=None):

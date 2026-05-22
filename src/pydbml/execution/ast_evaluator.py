@@ -307,14 +307,38 @@ class ASTEvaluator:
 
         type_name = node.type_name.lower()
 
+        # --------------------------
+        # ✅ 1. MODULE SUPPORT
+        # --------------------------
+        if hasattr(self.registry, "modules") and type_name in self.registry.modules:
+            return PluginObject(self.registry.modules[type_name])
+
+        # --------------------------
+        # ✅ 2. PYTHON FUNCTIONS (FIX ✅ MOVE UP)
+        # --------------------------
+        if type_name in self.registry.functions:
+            func = self.registry.functions[type_name]
+            args = [self._to_python(self.evaluate(arg)) for arg in node.args]
+            result = func(*args)
+            return self._to_pydbml(result)
+
+        # --------------------------
+        # ✅ 3. PLUGIN CLASSES
+        # --------------------------
         if type_name in self.registry.classes:
             py_class = self.registry.classes[type_name]
             args = [self._to_python(self.evaluate(arg)) for arg in node.args]
             return py_class(*args)
 
+        # --------------------------
+        # ✅ 4. BUILTIN ARRAY
+        # --------------------------
         if type_name == "array":
             return Array()
 
+        # --------------------------
+        # ✅ 5. IN-MEMORY OBJECT
+        # --------------------------
         if hasattr(self, "object_defs") and type_name in self.object_defs:
             obj_def = self.object_defs[type_name]
             instance = ObjectInstance(obj_def)
@@ -324,6 +348,9 @@ class ASTEvaluator:
 
             return instance
 
+        # --------------------------
+        # ✅ 6. FILE-LOADED OBJECT
+        # --------------------------
         if type_name != "object":
             loader = ObjectLoader(self.resolver)
             obj_def = loader.load(type_name)
@@ -335,12 +362,15 @@ class ASTEvaluator:
 
             return instance
 
-        # ✅ NEW: explicit failure
+        # --------------------------
+        # ❌ UNKNOWN TYPE
+        # --------------------------
         raise raise_error(
             "TYPE_ERROR",
             f"Unknown object type: {type_name}",
             node=node
         )
+
     def _eval_object_def(self, node):
         """Store object definition."""
 
@@ -603,7 +633,29 @@ class ASTEvaluator:
     def _eval_import(self, node):
         path = node.path
 
-        # ✅ file path
+        # ✅ MODULE IMPORT
+        if node.is_module:
+            module = importlib.import_module(path)
+
+            # ✅ store module
+            if not hasattr(self.registry, "modules"):
+                self.registry.modules = {}
+
+            self.registry.modules[path.lower()] = module
+
+            # ✅ register classes + functions
+            for name in dir(module):
+                attr = getattr(module, name)
+
+                if isinstance(attr, type):
+                    self.registry.classes[name.lower()] = attr
+
+                elif callable(attr):
+                    self.registry.functions[name.lower()] = attr
+
+            return None
+
+        # ✅ EXISTING FILE / MODULE IMPORT
         if path.endswith(".py") or "/" in path or "\\" in path:
             spec = importlib.util.spec_from_file_location("plugin_mod", path)
             module = importlib.util.module_from_spec(spec)
@@ -1281,6 +1333,11 @@ class ASTEvaluator:
 
         # ✅ SAFE TO EVALUATE AFTER
         target = self.evaluate(node.target)
+
+        # ✅ ✅ CRITICAL FIX: unwrap PluginObject
+        if isinstance(target, PluginObject):
+            target = target.obj
+
         args = [self.evaluate(arg) for arg in node.args]
 
         # --------------------------
@@ -1324,6 +1381,17 @@ class ASTEvaluator:
             result = method(*py_args)
 
             return self._to_pydbml(result)
+
+        # --------------------------
+        # ✅ NEW: Native Python method fallback (FINAL FIX)
+        # --------------------------
+        if hasattr(target, method_name):
+            method = getattr(target, method_name)
+
+            if callable(method):
+                py_args = [self._to_python(a) for a in args]
+                result = method(*py_args)
+                return self._to_pydbml(result)
 
         # --------------------------
         # ❌ Not found
