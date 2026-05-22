@@ -77,6 +77,7 @@ class ASTEvaluator:
         self.step_out_depth = None
         self.debug_log = []
         self.watch_vars = set()
+        self._node_plugins = {}
         self.debug_controller = DebugController()
         self.interactive_mode = True
         self.builtins = BuiltinRegistry()
@@ -118,6 +119,10 @@ class ASTEvaluator:
             VariableNode: self._eval_variable,
             BinaryOpNode: self._eval_binary,
         }
+
+    def register_node(self, node_cls, handler):
+        self._node_plugins[node_cls] = handler
+
     # --------------------------
     # ✅ Builtin Registration
     # --------------------------
@@ -140,16 +145,16 @@ class ASTEvaluator:
             self._trace(node)
 
             # ✅ allow raw Python functions (tests, hooks)
-            import types
             if isinstance(node, types.FunctionType):
                 return node()
 
-            # ✅ special-case NULL
-            if isinstance(node, VariableNode) and node.name.lower() == "null":
-                return UNSET
+            if isinstance(node, (Real, String, Boolean, Array, ObjectInstance, PluginObject)):
+                return node
 
             # ✅ dispatch lookup
-            handler = self._dispatch.get(type(node))
+            node_type = type(node)
+
+            handler = self._dispatch.get(node_type) or self._node_plugins.get(node_type)
 
             if handler:
                 return handler(node)
@@ -230,20 +235,11 @@ class ASTEvaluator:
         return None
 
     def _eval_handle(self, node):
-        """
-        Handle TRY / HANDLE / ELSE construct.
-        """
-
         try:
-            result = None
+            result = self._eval_block(node.try_block)
 
-            for stmt in node.try_block:
-                result = self.evaluate(stmt)
-
-            # ✅ success case
             if node.else_block:
-                for stmt in node.else_block:
-                    result = self.evaluate(stmt)
+                return self._eval_block(node.else_block)
 
             return result
 
@@ -251,31 +247,17 @@ class ASTEvaluator:
 
             for condition, block in node.handlers:
 
-                # ✅ HANDLE ANY
                 if condition == "ANY":
-                    result = None
-                    for stmt in block:
-                        result = self.evaluate(stmt)
-                    return result
+                    return self._eval_block(block)
 
-                # ✅ HANDLE (code1, code2) or (code1,)
                 if isinstance(condition, tuple):
+                    code1, code2 = condition
 
-                    # ✅ SINGLE CODE MATCH
-                    if len(condition) == 2 and condition[1] is None:
-                        if e.code1 == condition[0]:
-                            result = None
-                            for stmt in block:
-                                result = self.evaluate(stmt)
-                            return result
+                    if code2 is None and e.code1 == code1:
+                        return self._eval_block(block)
 
-                    # ✅ EXACT MATCH
-                    elif len(condition) == 2:
-                        if (e.code1, e.code2) == condition:
-                            result = None
-                            for stmt in block:
-                                result = self.evaluate(stmt)
-                            return result
+                    if code2 is not None and (e.code1, e.code2) == condition:
+                        return self._eval_block(block)
 
             raise
 
@@ -1017,107 +999,75 @@ class ASTEvaluator:
             self.breakpoints[line] = None
 
     def _eval_do(self, node):
-        # --------------------------
-        # ✅ 1. INDICES LOOP
-        # --------------------------
         if node.mode == "indices":
-            iter_value = self.evaluate(node.iterable)
+            return self._loop_indices(node)
 
-            # unwrap variable if needed
-            if isinstance(iter_value, Variable):
-                iter_value = iter_value.get()
-
-            array_obj = iter_value
-
-            for key in sorted(array_obj.value.keys()):
-
-                # ✅ loop variable = actual index
-                self.env.set(node.var, Real(key), False)
-
-                try:
-                    eval_fn = self.evaluate
-                    for stmt in node.body:
-                        eval_fn(stmt)
-                except ContinueSignal:
-                    continue
-                except BreakSignal:
-                    break
-                
-            return None
-
-        # --------------------------
-        # ✅ 2. VALUES LOOP
-        # --------------------------
         if node.mode == "values":
-            iter_value = self.evaluate(node.iterable)
+            return self._loop_values(node)
 
-            # unwrap variable if needed
-            if isinstance(iter_value, Variable):
-                iter_value = iter_value.get()
-
-            array_obj = iter_value
-
-            for val in array_obj.value.values():
-
-                # ✅ loop variable = value
-                self.env.set(node.var, val, False)
-
-                try:
-                    for stmt in node.body:
-                        self.evaluate(stmt)
-                except ContinueSignal:
-                    continue
-                except BreakSignal:
-                    break
-                
-            return None
-
-        # --------------------------
-        # ✅ 3. RANGE LOOP
-        # --------------------------
         if node.start is not None:
-        
-            start_val = self.evaluate(node.start).value
-            end_val = self.evaluate(node.end).value
-            step_val = self.evaluate(node.step).value if node.step else 1
+            return self._loop_range(node)
 
-            i = start_val
+        return self._loop_infinite(node)
 
-            while True:
-            
-                if step_val > 0 and i > end_val:
-                    break
-                if step_val < 0 and i < end_val:
-                    break
+    def _loop_indices(self, node):
+        array_obj = self._unwrap_iterable(node.iterable)
 
-                self.env.set(node.var, Real(i), False)
+        for key in sorted(array_obj.value.keys()):
+            self.env.set(node.var, Real(key), False)
 
-                try:
-                    for stmt in node.body:
-                        self.evaluate(stmt)
-                except ContinueSignal:
-                    i += step_val
-                    continue
-                except BreakSignal:
-                    break
-                
-                i += step_val
-
-            return None
-
-        # --------------------------
-        # ✅ 4. INFINITE LOOP
-        # --------------------------
-        while True:
             try:
-                for stmt in node.body:
-                    self.evaluate(stmt)
+                self._eval_block(node.body)
             except ContinueSignal:
                 continue
             except BreakSignal:
                 break
-            
-        return None
+
+    def _loop_values(self, node):
+        array_obj = self._unwrap_iterable(node.iterable)
+
+        for val in array_obj.value.values():
+            self.env.set(node.var, val, False)
+
+            try:
+                self._eval_block(node.body)
+            except ContinueSignal:
+                continue
+            except BreakSignal:
+                break
+
+    def _loop_range(self, node):
+        start = self.evaluate(node.start).value
+        end = self.evaluate(node.end).value
+        step = self.evaluate(node.step).value if node.step else 1
+
+        i = start
+
+        while (step > 0 and i <= end) or (step < 0 and i >= end):
+            self.env.set(node.var, Real(i), False)
+
+            try:
+                self._eval_block(node.body)
+            except ContinueSignal:
+                i += step
+                continue
+            except BreakSignal:
+                break
+
+            i += step
+
+    def _loop_infinite(self, node):
+        while True:
+            try:
+                self._eval_block(node.body)
+            except ContinueSignal:
+                continue
+            except BreakSignal:
+                break
+
+    def _unwrap_iterable(self, iterable):
+        value = self.evaluate(iterable)
+        return value.get() if isinstance(value, Variable) else value
 
     def _construct_object(self, instance, obj_def, type_name, args, node):
         
@@ -1165,27 +1115,16 @@ class ASTEvaluator:
                 node=node
             )
 
-        # --------------------------
-        # ✅ EXPRESSION IF
-        # --------------------------
+        # ✅ expression IF
         if node.is_expression:
-            if condition.value:
-                return self.evaluate(node.then_branch)
-            else:
-                return self.evaluate(node.else_branch)
-    
-        # --------------------------
-        # ✅ BLOCK IF
-        # --------------------------
-        if condition.value:
-            result = None
-            for stmt in node.then_branch:
-                result = self.evaluate(stmt)
-            return result
+            branch = node.then_branch if condition.value else node.else_branch
+            return self.evaluate(branch)
 
-        # --------------------------
-        # ✅ ELIF BLOCKS
-        # --------------------------
+        # ✅ THEN
+        if condition.value:
+            return self._eval_block(node.then_branch)
+
+        # ✅ ELIF
         for cond, block in getattr(node, "elif_blocks", []):
             cond_val = self.evaluate(cond)
 
@@ -1197,19 +1136,11 @@ class ASTEvaluator:
                 )
 
             if cond_val.value:
-                result = None
-                for stmt in block:
-                    result = self.evaluate(stmt)
-                return result
+                return self._eval_block(block)
 
-        # --------------------------
-        # ✅ ELSE BLOCK
-        # --------------------------
-        if node.else_branch is not None:
-            result = None
-            for stmt in node.else_branch:
-                result = self.evaluate(stmt)
-            return result
+        # ✅ ELSE
+        if node.else_branch:
+            return self._eval_block(node.else_branch)
 
         return None
 

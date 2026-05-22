@@ -269,7 +269,7 @@ class GoLabelNode(ASTNode):
         super().__init__(token)
         self.name = name
 
-class PrintNode:
+class PrintNode(ASTNode):
     def __init__(self, expr, token=None):
+        super().__init__(token)
         self.expr = expr
-        self.token = token
