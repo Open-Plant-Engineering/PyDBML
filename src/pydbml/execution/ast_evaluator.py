@@ -54,6 +54,8 @@ from pydbml.runtime.error_codes import raise_error
 from pydbml.debugger.debug_controller import DebugController
 from pydbml.builtins.iftrue import builtin_iftrue
 from pydbml.builtins.undefined import builtin_undefined
+from pydbml.builtins.unset import builtin_unset
+from pydbml.types.unset import UNSET
 from pydbml.runtime.builtins import BuiltinRegistry
 
 class ASTEvaluator:
@@ -80,6 +82,7 @@ class ASTEvaluator:
 
         self.builtins.register("iftrue", builtin_iftrue)
         self.builtins.register("undefined", builtin_undefined)
+        self.builtins.register("unset", builtin_unset)
 
     # --------------------------
     # ✅ Builtin Registration
@@ -408,6 +411,10 @@ class ASTEvaluator:
             # --------------------------
             if isinstance(node, BooleanNode):
                 return Boolean(node.value)
+
+            # ✅ NULL literal support
+            if isinstance(node, VariableNode) and node.name.lower() == "null":
+                return UNSET
 
             # --------------------------
             # Variable
@@ -1006,6 +1013,10 @@ class ASTEvaluator:
         return None
 
     def _construct_object(self, instance, obj_def, type_name, args, node):
+        
+        for attr in obj_def.members:
+            instance.value[attr] = UNSET
+
         constructor_name = type_name
 
         if constructor_name in obj_def.methods:
@@ -1265,11 +1276,11 @@ class ASTEvaluator:
                 use_raw = getattr(builtin, "_raw_args", False)
 
                 if use_raw:
-                    # ✅ raw mode → pass AST
                     args = [node.target] + node.args
                 else:
-                    # ✅ normal mode → evaluate arguments
-                    args = [self.evaluate(arg) for arg in node.args]
+                    # ✅ IMPORTANT: include evaluated target
+                    evaluated_target = self.evaluate(node.target)
+                    args = [evaluated_target] + [self.evaluate(arg) for arg in node.args]
 
                 return builtin(self, args, node)
 
@@ -1330,6 +1341,9 @@ class ASTEvaluator:
 
     def _eval_dot_access(self, node):
         obj = self.evaluate(node.target)
+        
+        if obj is UNSET:
+            return UNSET
 
         if isinstance(obj, PluginObject):
             obj = obj.obj
@@ -1362,8 +1376,8 @@ class ASTEvaluator:
         # --------------------------
         if isinstance(obj, ObjectInstance):
 
-            if node.attribute in obj.value:
-                return self._to_pydbml(obj.value[node.attribute])
+            if node.attribute in obj.definition.members:
+                return obj.value.get(node.attribute, UNSET)
 
             if node.attribute in obj.definition.methods:
                 return ("__method__", obj, node.attribute)

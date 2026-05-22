@@ -1,5 +1,5 @@
 from pydbml.types.base import PyDBMLType
-
+from pydbml.types.unset import UNSET
 
 class Variable:
     """
@@ -16,7 +16,7 @@ class Variable:
 
     def get(self) -> PyDBMLType:
         if self.value is None:
-            raise ValueError(f"Variable '{self.name}' is not initialized")
+            return UNSET
         return self.value
 
     def delete(self) -> None:

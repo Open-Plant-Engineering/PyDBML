@@ -1,6 +1,6 @@
 import os
 from pydbml.core.engine import Engine
-
+from pydbml.types.unset import UNSET
 
 def test_object_from_lib(tmp_path):
     lib = tmp_path / "lib"
@@ -25,4 +25,4 @@ ENDOBJECT
     e.execute("!p = object person()")
     r = e.execute("!p.name")
 
-    assert r is None
+    assert r == UNSET

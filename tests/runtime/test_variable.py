@@ -2,7 +2,6 @@ import pytest
 from pydbml.runtime.environment import Environment
 from pydbml.types.string import String
 
-
 def test_local_variable_set_get():
     env = Environment()
 
@@ -37,5 +36,7 @@ def test_uninitialized_variable():
     env.set("x", None)
     var = env.get("x")
 
-    with pytest.raises(ValueError):
-        var.get()
+    result = var.get()
+    from pydbml.types.unset import UNSET
+    assert result is UNSET
+
