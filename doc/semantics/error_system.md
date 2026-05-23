@@ -11,11 +11,15 @@ The PyDBML error system defines how runtime errors are:
 
 Errors are first-class execution events and may interrupt normal control flow.
 
+The system also integrates Python runtime errors into PyDBML error semantics.
+
 ---
 
 ## 2. Error Categories
 
 Errors in PyDBML fall into two categories:
+
+---
 
 ### 2.1 Runtime Errors
 
@@ -30,6 +34,7 @@ Errors caused by program execution:
 - ATTRIBUTE_ERROR
 - METHOD_NOT_FOUND
 - CONSTRUCTOR_ERROR
+- IMPORT_ERROR
 
 ---
 
@@ -108,7 +113,39 @@ invalid operator → OPERATOR\_ERROR
 
 ---
 
+### 4.5 Method Resolution Error
+
+Occurs when no method is found during execution:
+
+```
+
+!x.unknown() → METHOD\_NOT\_FOUND
+
+```
+
+Includes failure across:
+
+- PyDBML object methods
+- Plugin methods
+- Python object methods
+
+---
+
+### 4.6 Module Import Error
+
+Occurs when module cannot be loaded:
+
+```
+
+import module unknown → IMPORT\_ERROR
+
+```
+
+---
+
 ## 5. Error Propagation
+
+---
 
 ### 5.1 Default Behavior
 
@@ -246,7 +283,8 @@ Control signals are NOT errors
 They:
 
 - must not be caught by HANDLE blocks
-- propagate differently
+- must propagate without conversion
+- are part of normal execution
 
 ---
 
@@ -267,14 +305,15 @@ They must not intercept:
 ReturnSignal
 BreakSignal
 ContinueSignal
+GoLabelSignal
 
 ```
 
 ---
 
-## 10. Error Wrapping
+## 10. Python Error Integration
 
-Python exceptions may be converted into PyDBML errors:
+PyDBML integrates Python exceptions into its error system.
 
 ---
 
@@ -282,15 +321,46 @@ Python exceptions may be converted into PyDBML errors:
 
 | Python Error | PyDBML Error |
 |-------------|-------------|
-| TypeError | TYPE_ERROR |
-| KeyError | NAME_ERROR |
-| ValueError | TYPE_ERROR |
+| TypeError   | TYPE_ERROR |
+| KeyError    | NAME_ERROR |
+| ValueError  | TYPE_ERROR |
+| AttributeError | ATTRIBUTE_ERROR |
 
 ---
 
-### 10.2 Behavior
+### 10.2 Native Method Errors
 
-If unexpected:
+Errors raised during Python method execution:
+
+```
+
+!f.write(...) → Python error → converted
+
+```
+
+Behavior:
+
+- Known errors → mapped to PyDBML error types
+- Unknown errors → wrapped as INTERNAL
+
+---
+
+### 10.3 Module Import Errors
+
+```
+
+import module x
+
+```
+
+- If module not found → IMPORT_ERROR
+- If load fails → INTERNAL or IMPORT_ERROR
+
+---
+
+### 10.4 Wrapping Behavior
+
+If an exception is not explicitly mapped:
 
 ```
 
@@ -322,7 +392,7 @@ If caught in HANDLE block:
 
 ```
 
-function returns normally
+function continues or returns normally
 
 ```
 
@@ -343,7 +413,7 @@ error propagates
 
 ```
 
-Unless caught explicitly.
+Unless explicitly handled.
 
 ---
 
@@ -353,7 +423,7 @@ Unless caught explicitly.
 
 ### 13.1 Behavior
 
-Errors inside method:
+Errors inside method calls (including Python methods):
 
 ```
 
@@ -361,7 +431,7 @@ propagate to caller
 
 ```
 
-Unless handled within method body.
+Unless caught within a HANDLE block.
 
 ---
 
@@ -374,6 +444,7 @@ The engine ensures:
 - errors do not corrupt environment state
 - scope cleanup occurs correctly
 - control signals remain intact
+- Python errors are safely converted
 
 ---
 
@@ -460,6 +531,16 @@ TYPE\_ERROR
 
 ---
 
+### Module Not Found
+
+```
+
+import module unknown → IMPORT\_ERROR
+
+```
+
+---
+
 ## 19. Design Guarantees
 
 The error system guarantees:
@@ -468,6 +549,7 @@ The error system guarantees:
 - predictable propagation
 - safe execution boundaries
 - precise error reporting
+- consistent Python integration
 
 ---
 
@@ -478,3 +560,4 @@ The error system does not include:
 - compile-time errors
 - warnings
 - static type enforcement
+- advanced sandboxing of Python exceptions

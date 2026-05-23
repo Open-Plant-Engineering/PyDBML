@@ -1,0 +1,7 @@
+
+import module builtins
+import module math
+
+!f = object open('file.txt', 'w')
+!f.write('Module Test')
+!f.close()

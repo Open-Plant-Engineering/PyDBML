@@ -34,7 +34,7 @@ global\_var ::= "!!" identifier
 ```
 
 number  ::= digit { digit } \[ "." digit { digit } ]
-string  ::= '"' { character } '"' | "'" { character } "'"
+string  ::= "|" { character } "|" | "'" { character } "'"
 boolean ::= "true" | "false"
 
 ```
@@ -57,20 +57,37 @@ program ::= { statement }
 
 statement ::=
 assignment
-\| print        \_stmt
-\| if           \_stmt
-\| do           \_stmt
-\| function     \_def
-\| return       \_stmt
-\| break        \_stmt
-\| skip         \_stmt
-\| expression   \_stmt
+\| print\_stmt
+\| import\_stmt
+\| if\_stmt
+\| do\_stmt
+\| function\_def
+\| return\_stmt
+\| break\_stmt
+\| skip\_stmt
+\| handle\_stmt
+\| label\_stmt
+\| golabel\_stmt
+\| expression\_stmt
 
 ```
 
 ---
 
-## 4. Assignment
+## 4. Import Statement
+
+```
+
+import\_stmt ::=
+"import" "|" identifier "|"              (\* file/plugin import *)
+\| "import" "module" identifier             (* Python module import *)
+\| "import" "module" "|" identifier "|"     (* optional module pipe syntax \*)
+
+```
+
+---
+
+## 5. Assignment
 
 ```
 
@@ -81,7 +98,7 @@ variable   ::= local\_var | global\_var
 
 ---
 
-## 5. Print Statement
+## 6. Print Statement
 
 ```
 
@@ -91,7 +108,7 @@ print\_stmt ::= "$P" expression
 
 ---
 
-## 6. If Statement
+## 7. If Statement
 
 ```
 
@@ -110,7 +127,7 @@ block
 
 ---
 
-## 7. Do Loop
+## 8. Do Loop
 
 ```
 
@@ -129,7 +146,7 @@ block
 
 ---
 
-### 7.1 Range Clause
+### 8.1 Range Clause
 
 ```
 
@@ -139,7 +156,7 @@ range\_clause ::= variable "from" expression "to" expression
 
 ---
 
-### 7.2 Indices Clause
+### 8.2 Indices Clause
 
 ```
 
@@ -149,7 +166,7 @@ indices\_clause ::= variable "indices" expression
 
 ---
 
-### 7.3 Values Clause
+### 8.3 Values Clause
 
 ```
 
@@ -159,7 +176,7 @@ values\_clause ::= variable "values" expression
 
 ---
 
-## 8. Function Definition
+## 9. Function Definition
 
 ```
 
@@ -172,18 +189,18 @@ block
 
 ---
 
-### 8.1 Parameter List
+### 9.1 Parameter List
 
 ```
 
 param\_list ::= param { "," param }
-param      ::= identifier
+param      ::= identifier \[ "is" type ]
 
 ```
 
 ---
 
-### 8.2 Function Call
+### 9.2 Function Call
 
 ```
 
@@ -194,7 +211,7 @@ arg\_list      ::= expression { "," expression }
 
 ---
 
-## 9. Return Statement
+## 10. Return Statement
 
 ```
 
@@ -204,19 +221,18 @@ return\_stmt ::= "return" expression
 
 ---
 
-## 10. Skip / Break
+## 11. Skip / Break
 
 ```
 
 break\_stmt ::= "break"
-
 skip\_stmt  ::= "skipif" "(" expression ")"
 
 ```
 
 ---
 
-## 11. Expressions
+## 12. Expressions
 
 ```
 
@@ -226,7 +242,7 @@ expression ::= logical\_or
 
 ---
 
-### 11.1 Logical OR
+### 12.1 Logical OR
 
 ```
 
@@ -236,7 +252,7 @@ logical\_or ::= logical\_and { "OR" logical\_and }
 
 ---
 
-### 11.2 Logical AND
+### 12.2 Logical AND
 
 ```
 
@@ -246,7 +262,7 @@ logical\_and ::= equality { "AND" equality }
 
 ---
 
-### 11.3 Equality
+### 12.3 Equality
 
 ```
 
@@ -256,7 +272,7 @@ equality ::= comparison { ( "==" | "!=" ) comparison }
 
 ---
 
-### 11.4 Comparison
+### 12.4 Comparison
 
 ```
 
@@ -266,7 +282,7 @@ comparison ::= term { ( ">" | "<" | ">=" | "<=" ) term }
 
 ---
 
-### 11.5 Term
+### 12.5 Term
 
 ```
 
@@ -276,7 +292,7 @@ term ::= factor { ( "+" | "-" ) factor }
 
 ---
 
-### 11.6 Factor
+### 12.6 Factor
 
 ```
 
@@ -286,17 +302,34 @@ factor ::= unary { ( "\*" | "/" ) unary }
 
 ---
 
-### 11.7 Unary
+### 12.7 Unary
 
 ```
 
-unary ::= \[ "NOT" ] primary
+unary ::= \[ "NOT" ] postfix
 
 ```
 
 ---
 
-### 11.8 Primary
+### 12.8 Postfix (IMPORTANT ADDITION ✅)
+
+Supports method calls, attribute access, and indexing.
+
+```
+
+postfix ::= primary { postfix\_op }
+
+postfix\_op ::=
+"." identifier "(" \[arg\_list] ")"   (\* method call *)
+\| "." identifier                      (* attribute access *)
+\| "\[" expression "]"                  (* index access \*)
+
+```
+
+---
+
+### 12.9 Primary
 
 ```
 
@@ -307,13 +340,14 @@ number
 \| variable
 \| function\_call
 \| object\_creation
+\| iftrue\_expr
 \| "(" expression ")"
 
 ```
 
 ---
 
-## 12. Object Creation
+## 13. Object Creation
 
 ```
 
@@ -323,27 +357,7 @@ object\_creation ::= "object" identifier "(" \[arg\_list] ")"
 
 ---
 
-## 13. Object Access
-
-```
-
-object\_access ::= primary "." identifier
-
-```
-
----
-
-## 14. Index Access
-
-```
-
-index\_access ::= primary "\[" expression "]"
-
-```
-
----
-
-## 15. Expression Statement
+## 14. Expression Statement
 
 ```
 
@@ -353,7 +367,7 @@ expression\_stmt ::= expression
 
 ---
 
-## 16. Block
+## 15. Block
 
 ```
 
@@ -363,7 +377,7 @@ block ::= { statement }
 
 ---
 
-## 17. Types
+## 16. Types
 
 ```
 
@@ -373,7 +387,7 @@ type ::= "real" | "string" | "boolean" | "array" | "object"
 
 ---
 
-## 18. Special Expressions
+## 17. Special Expressions
 
 ### IfTrue Expression
 
@@ -385,7 +399,7 @@ iftrue\_expr ::= "iftrue" "(" expression "," expression "," expression ")"
 
 ---
 
-## 19. Error Handling
+## 18. Error Handling
 
 ```
 
@@ -399,7 +413,7 @@ block
 
 ---
 
-## 20. Label and Jump
+## 19. Label and Jump
 
 ```
 
@@ -410,10 +424,19 @@ golabel\_stmt ::= "golabel" identifier
 
 ---
 
-## 21. Notes
+## 20. Notes
 
-1. Grammar is evaluated using recursive-descent parsing.
-2. Expressions follow operator precedence.
-3. Function scope introduces new variable scope.
+1. Grammar is implemented using recursive-descent parsing.
+2. Expressions follow defined operator precedence rules.
+3. Function execution introduces a new scope.
 4. Variables are resolved dynamically at runtime.
-
+5. Identifiers and method names are **case-insensitive**.
+6. Method calls follow runtime resolution order:
+   - built-in
+   - PyDBML object
+   - plugin
+   - Python method fallback
+7. Object creation supports:
+   - PyDBML objects
+   - plugin classes
+   - Python functions and classes

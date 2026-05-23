@@ -9,6 +9,7 @@ Execution consists of:
 1. Parsing source code into AST
 2. Evaluating AST nodes recursively
 3. Managing runtime state through an environment
+4. Interacting with Python runtime (modules, functions, objects)
 
 ---
 
@@ -36,7 +37,7 @@ runtime values
 
 ### 3.1 Node-Based Evaluation
 
-Each AST node is evaluated independently.
+Each AST node is evaluated independently:
 
 ```
 
@@ -78,6 +79,8 @@ The environment consists of:
 - global scope (map)
 - function registry
 - object definitions
+- module registry (Python modules)
+- class/function registry (Python + plugins)
 
 ---
 
@@ -91,7 +94,12 @@ name → runtime value
 
 ```
 
-Local variables are stored in a stack of scopes.
+Values may include:
+
+- PyDBML primitives (Real, String, Boolean)
+- Array
+- ObjectInstance
+- PluginObject (wrapped Python objects)
 
 ---
 
@@ -114,7 +122,7 @@ Variable lookup follows:
 
 ### 5.1 Evaluation Order
 
-Expressions are evaluated left-to-right.
+Expressions are evaluated left-to-right with respect to operator precedence.
 
 ```
 
@@ -122,7 +130,14 @@ Expressions are evaluated left-to-right.
 
 ```
 
-is evaluated according to operator precedence rules.
+Execution:
+
+```
+
+3 \* 2 → 6
+5 + 6 → 11
+
+```
 
 ---
 
@@ -158,7 +173,7 @@ true OR expr → expr not evaluated
 
 ```
 
-Steps:
+Execution:
 
 1. Evaluate expression
 2. Store result in environment
@@ -178,13 +193,13 @@ if (cond) then ... elseif ... else ...
 
 ```
 
-Execution steps:
+Execution:
 
-1. Evaluate first condition
+1. Evaluate condition
 2. If true → execute block → exit
 3. Else evaluate next condition
-4. Continue until a true condition is found
-5. If none match → execute else (if present)
+4. Continue until match
+5. Execute else block if provided
 
 ---
 
@@ -203,9 +218,9 @@ do !i from a to b
 Execution:
 
 1. Evaluate a, b
-2. Initialize counter i = a
-3. Loop until termination condition
-4. Increment per iteration
+2. Initialize counter
+3. Execute loop body
+4. Update per iteration
 
 ---
 
@@ -217,10 +232,7 @@ do !v values !arr
 
 ```
 
-Execution:
-
-- Iterate over values of array
-- Assign each value to !v
+- Iterates over array values
 
 ---
 
@@ -232,10 +244,7 @@ do !i indices !arr
 
 ```
 
-Execution:
-
-- Iterate over indices of array
-- Assign index to !i
+- Iterates over array indices
 
 ---
 
@@ -249,13 +258,11 @@ enddo
 
 ```
 
-Executes indefinitely until terminated.
+Executes until interrupted.
 
 ---
 
 ### 7.3 Loop Control
-
----
 
 #### Break
 
@@ -265,11 +272,7 @@ break
 
 ```
 
-Effect:
-
 - Immediately exits loop
-
-Implemented via control signal.
 
 ---
 
@@ -281,9 +284,7 @@ skipif(condition)
 
 ```
 
-Effect:
-
-- Skips current iteration if condition true
+- Skips current iteration
 
 ---
 
@@ -299,19 +300,17 @@ Effect:
 
 ```
 
-Execution steps:
+Execution:
 
 1. Evaluate arguments
 2. Create new scope
-3. Bind parameters to arguments
-4. Execute function body
+3. Bind parameters
+4. Execute body
 5. Return value
 
 ---
 
 ### 8.2 Scope Behavior
-
-Each function call creates a new local scope.
 
 ```
 
@@ -330,11 +329,8 @@ return value
 
 ```
 
-Execution:
-
-- Stops function execution immediately
-- Returns value to caller
-- Implemented via control signal
+- Stops execution immediately
+- Returns value using `ReturnSignal`
 
 ---
 
@@ -350,11 +346,20 @@ object type(args)
 
 ```
 
-Execution:
+### Resolution Order
+
+1. Python functions (e.g., open)
+2. Plugin classes
+3. PyDBML object definitions
+4. File-loaded objects
+
+### Execution
 
 1. Resolve type
-2. Create instance
-3. Execute constructor if defined
+2. Evaluate arguments
+3. Convert arguments to Python if needed
+4. Create instance or call function
+5. Wrap Python objects as `PluginObject`
 
 ---
 
@@ -366,27 +371,89 @@ Execution:
 
 ```
 
-Execution:
+### Execution Steps
 
 1. Evaluate object
-2. Resolve method
-3. Bind `this`
-4. Execute method body
-5. Return result
+2. Evaluate arguments
+3. Unwrap Python object if needed
+4. Resolve method
+5. Execute method
+6. Convert result to PyDBML type
 
 ---
 
-## 10. Error Handling Semantics
+### Method Resolution Order
+
+1. Built-in methods
+2. PyDBML object methods
+3. Plugin methods
+4. Native Python methods (fallback)
 
 ---
 
-### 10.1 Error Propagation
+### Case-Insensitive Behavior
+
+Method calls are case-insensitive:
+
+```
+
+write, WRITE, WrItE → same method
+
+```
+
+---
+
+### Native Python Method Execution
+
+If method not found in PyDBML layers:
+
+1. Attempt direct match (`hasattr`)
+2. Attempt case-insensitive match
+3. Invoke via Python reflection
+
+---
+
+## 10. Module Execution
+
+### 10.1 Importing Modules
+
+```
+
+import module module\_name
+
+```
+
+Execution:
+
+1. Load Python module
+2. Register functions and classes
+3. Store module in registry
+
+---
+
+### 10.2 Usage
+
+```
+
+import module builtins
+
+!f = object open('file.txt', 'w')
+
+```
+
+---
+
+## 11. Error Handling Semantics
+
+---
+
+### 11.1 Error Propagation
 
 Errors propagate upward unless handled.
 
 ---
 
-### 10.2 Handle Block
+### 11.2 Handle Block
 
 ```
 
@@ -396,14 +463,14 @@ HANDLE (...) ... ELSEHANDLE ...
 
 Execution:
 
-1. Execute try block
-2. If error occurs → match handler
-3. Execute matching handler
+1. Execute block
+2. On error → match handler
+3. Execute handler
 4. Stop propagation
 
 ---
 
-## 11. Control Signals
+## 12. Control Signals
 
 Certain control flows are implemented as signals:
 
@@ -418,7 +485,32 @@ Signals interrupt normal execution.
 
 ---
 
-## 12. Evaluation Guarantees
+## 13. Python Integration Execution
+
+PyDBML supports seamless Python interaction.
+
+### Supported Operations
+
+- Import Python modules
+- Call Python functions
+- Instantiate Python objects
+- Invoke Python methods
+
+### Execution Flow Example
+
+```
+
+ObjectNode(open)
+→ Python function call
+
+CallNode(write)
+→ Python method invocation
+
+```
+
+---
+
+## 14. Evaluation Guarantees
 
 The execution model guarantees:
 
@@ -426,10 +518,11 @@ The execution model guarantees:
 - consistent variable resolution
 - strict scope boundaries
 - predictable control flow
+- safe Python integration
 
 ---
 
-## 13. Non-Goals
+## 15. Non-Goals
 
 The execution model does not support:
 
@@ -439,9 +532,11 @@ The execution model does not support:
 
 ---
 
-## 14. Example Execution
+## 16. Example Execution
 
 ```
+
+import module builtins
 
 !x = 5
 !y = 10
@@ -451,7 +546,8 @@ The execution model does not support:
 
 Execution:
 
-1. Evaluate 5 → assign to x
-2. Evaluate 10 → assign to y
-3. Evaluate x + y → 15
-4. Assign 15 → z
+1. Import module → register runtime objects
+2. Assign 5 to x
+3. Assign 10 to y
+4. Evaluate x + y → 15
+5. Assign 15 to z

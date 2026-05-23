@@ -11,21 +11,24 @@ All values have an associated type that determines:
 - assignment validity
 - behavior during evaluation
 
-Types are enforced at runtime.
+Types are enforced dynamically during execution.
+
+PyDBML also supports integration with Python types through a bridging mechanism.
 
 ---
 
 ## 2. Core Types
 
-The following primitive types exist:
+The following primary types exist:
 
 | Type | Description |
-|------|-------------|
+|------|------------|
 | Real | Numeric values (integer and floating point) |
 | String | Textual data |
 | Boolean | Logical values (true/false) |
 | Array | Indexed collection |
-| ObjectInstance | Structured object with attributes and methods |
+| ObjectInstance | User-defined structured object |
+| PluginObject | Wrapped Python object |
 
 ---
 
@@ -35,7 +38,7 @@ Each value is represented as a runtime object:
 
 ```
 
-value → instance of PyDBMLType
+value → instance of PyDBML type class
 
 ```
 
@@ -43,9 +46,17 @@ Examples:
 
 ```
 
-5       → Real
-"abc"   → String
-true    → Boolean
+5        → Real
+'abc'    → String
+true     → Boolean
+
+```
+
+Python-derived values:
+
+```
+
+file handle → PluginObject
 
 ```
 
@@ -57,7 +68,7 @@ Type identity is determined by:
 
 ```
 
-type(value) → class type
+type(value) → runtime type class
 
 ```
 
@@ -73,12 +84,13 @@ type(Real(5)) → Real
 
 ## 5. Type Equality
 
-Two values are compatible if:
+Two values are considered compatible if:
 
 ```
 
-same type class
-OR allowed coercion applies
+same type
+OR
+allowed conversion applies
 
 ```
 
@@ -99,8 +111,8 @@ OR allowed coercion applies
 Rules:
 
 - Expression is evaluated first
-- Result is stored without conversion
-- No implicit type change unless explicitly allowed
+- Result is stored directly
+- Variable type is not fixed and can change dynamically
 
 ---
 
@@ -114,14 +126,13 @@ define function !!f(a, b) is real
 
 Rules:
 
-- Argument types must match expected parameter types
-- If mismatch → TYPE_ERROR
+- Arguments are evaluated before binding
+- Expected types are validated at runtime
+- Type mismatch → TYPE_ERROR
 
 ---
 
 ### 6.3 Return Type
-
-Functions must return declared type:
 
 ```
 
@@ -129,13 +140,10 @@ return value
 
 ```
 
-If mismatch:
+Rules:
 
-```
-
-RETURN\_TYPE error
-
-```
+- Returned value must match declared type
+- Mismatch → RETURN_TYPE error
 
 ---
 
@@ -143,27 +151,32 @@ RETURN\_TYPE error
 
 ---
 
-### 7.1 Explicit Conversion
+### 7.1 Automatic Conversion
 
-Only supported via:
+Limited implicit conversions are supported:
 
-```
-
-plugin logic OR evaluator conversion
-
-```
+| From | To | Behavior |
+|------|----|---------|
+| int → Real | automatic |
+| float → Real | automatic |
+| PyDBML → Python | automatic during method/function call |
 
 ---
 
-### 7.2 Implicit Conversion
+### 7.2 Python Conversion
 
-Limited cases allowed:
+When calling Python:
 
-| From | To | Behavior |
-|------|-----|----------|
-| int → Real | automatic |
-| float → Real | automatic |
-| Real → Python numeric | during operator execution |
+- PyDBML values → converted to Python equivalents
+- Python results → converted back:
+
+| Python Type | PyDBML Type |
+|-------------|------------|
+| int / float | Real |
+| str | String |
+| bool | Boolean |
+| list | Array |
+| object | PluginObject |
 
 ---
 
@@ -184,7 +197,7 @@ Boolean + Real → TYPE\_ERROR
 
 ### 8.1 Arithmetic Operations
 
-Valid only for:
+Valid:
 
 ```
 
@@ -192,13 +205,13 @@ Real + Real → Real
 
 ```
 
-Invalid combinations → TYPE_ERROR
+Invalid → TYPE_ERROR
 
 ---
 
 ### 8.2 Comparison Operations
 
-Valid combinations:
+Valid:
 
 ```
 
@@ -226,7 +239,10 @@ AND, OR, NOT
 
 ```
 
-Operands must be Boolean.
+Rules:
+
+- Operands must be Boolean
+- Short-circuit evaluation applies
 
 ---
 
@@ -234,14 +250,15 @@ Operands must be Boolean.
 
 Strings:
 
-- support length operations (plugin)
-- support concatenation via operator
+- support concatenation via `+`
+- are immutable
+- map directly to Python `str`
 
 Example:
 
 ```
 
-"hello" + "world"
+|hello| + |world|
 
 ```
 
@@ -263,8 +280,8 @@ index → value
 
 ### 10.2 Index Rules
 
-- Index must be numeric (Real)
-- Index converted to integer
+- Index must be Real
+- Converted to integer
 - Invalid index → INDEX_ERROR
 
 ---
@@ -289,26 +306,41 @@ index → value
 
 ---
 
-## 11. Object Type
+## 11. Object Types
 
 ---
 
-### 11.1 Structure
+### 11.1 ObjectInstance
+
+Represents PyDBML-defined objects:
 
 ```
 
 attributes
 methods
 
+```
+
+---
+
+### 11.2 PluginObject
+
+Represents Python-backed objects:
+
+```
+
+PluginObject:
+obj → underlying Python object
+
 ````
 
 ---
 
-### 11.2 Type Behavior
+### Behavior
 
-- attributes validated if defined statically
-- methods resolved dynamically
-- values stored as runtime objects
+- Supports method calls
+- Supports attribute access via reflection
+- Used for all Python integrations
 
 ---
 
@@ -318,25 +350,28 @@ methods
 
 ### 12.1 Definition
 
-Plugins define new types using:
+Plugin types are defined in Python:
 
 ```python
 @pydbml_class
+class Custom:
 ````
 
 ***
 
-### 12.2 Rules
+### 12.2 Behavior
 
-* plugin class defines behavior
-* methods exposed via decorators
-* operators mapped to functions
+* Methods exposed via decorators
+* Operators mapped via Python functions
+* Used as runtime types inside PyDBML
 
 ***
 
-### 12.3 Conversion
+### 12.3 Execution
 
-All plugin results must be converted to PyDBML types.
+* Arguments converted to Python
+* Method executed
+* Result converted back to PyDBML
 
 ***
 
@@ -346,8 +381,6 @@ All plugin results must be converted to PyDBML types.
 
 ### 13.1 Runtime Check
 
-Function:
-
 ```
 check_type(value, expected_type)
 ```
@@ -356,11 +389,9 @@ check_type(value, expected_type)
 
 ### 13.2 Behavior
 
-Returns:
-
 ```
-true → compatible
-false → TYPE_ERROR
+match → valid
+mismatch → TYPE_ERROR
 ```
 
 ***
@@ -373,10 +404,11 @@ false → TYPE_ERROR
 
 Type errors occur when:
 
-* invalid operation
-* invalid assignment
+* invalid operations
+* invalid assignments
 * incompatible function arguments
-* invalid return value
+* invalid return values
+* wrong method usage
 
 ***
 
@@ -384,14 +416,14 @@ Type errors occur when:
 
 ```
 TYPE_ERROR raised immediately
-execution halted (unless handled)
+execution interrupted
 ```
 
 ***
 
 ## 15. Evaluation Interaction
 
-Types participate in evaluation:
+Types participate directly in evaluation:
 
 ```
 evaluate(expression) → value(type)
@@ -400,44 +432,74 @@ evaluate(expression) → value(type)
 Operators depend on type:
 
 ```
-Real → arithmetic
-String → concatenation
-Object → method access
+Real    → arithmetic
+String  → concatenation
+Array   → indexing
+Object  → method access
 ```
 
 ***
 
 ## 16. Type Stability
 
-Types do not change dynamically:
+Variable types are dynamic:
 
 ```
 !x = 5
-!x = "abc"    (allowed assignment, but replaces value)
+!x = 'abc'
 ```
 
-Variable type is not fixed — value type changes per assignment.
+Result:
+
+* value replaced
+* type updated dynamically
 
 ***
 
-## 17. Type Safety Guarantees
+## 17. Python Integration
+
+The type system supports seamless Python interoperability.
+
+***
+
+### Behavior
+
+* Python objects are wrapped as PluginObject
+* Python methods can operate directly on converted values
+* Returned values are normalized
+
+***
+
+### Example
+
+```
+import module builtins
+
+!f = object open('file.txt', 'w')
+!f.write('Hello')
+```
+
+***
+
+## 18. Type Safety Guarantees
 
 The system guarantees:
 
-* operations validated before execution
-* invalid combinations prevented
-* consistent behavior across runtime
+* runtime validation before operations
+* prevention of invalid type combinations
+* consistent behavior across execution
+* safe integration with Python types
 
 ***
 
-## 18. Edge Cases
+## 19. Edge Cases
 
 ***
 
 ### Mixing Types
 
 ```
-5 + "abc" → TYPE_ERROR
+5 + 'abc' → TYPE_ERROR
 ```
 
 ***
@@ -450,41 +512,37 @@ true + 1 → TYPE_ERROR
 
 ***
 
-### Null / None
-
-If exists:
+### Python Object Handling
 
 ```
-treated as special value
-limited operations allowed
+file.write(...) → allowed
+file + 1 → TYPE_ERROR
 ```
 
 ***
 
-## 19. Type Extension
+## 20. Type Extension
 
-Types can be extended using plugins:
+Types can be extended via:
 
-```
-methods
-operators
-new types
-```
+* plugins
+* Python integration
+* custom objects
 
 ***
 
-## 20. Limitations
+## 21. Limitations
 
 The type system does not include:
 
 * static typing
 * compile-time validation
 * generics
-* inheritance hierarchy (limited support)
+* inheritance hierarchy (limited)
 
 ***
 
-## 21. Example
+## 22. Example
 
 ```
 !x = 5
@@ -500,11 +558,12 @@ Real + Real → Real
 
 ***
 
-## 22. Summary
+## 23. Summary
 
 The PyDBML type system:
 
-* is runtime-based
-* ensures type correctness during execution
-* supports extensibility
-* enforces safe operations
+* is dynamic and runtime-based
+* enforces correctness during execution
+* supports extensibility via plugins
+* enables seamless integration with Python
+

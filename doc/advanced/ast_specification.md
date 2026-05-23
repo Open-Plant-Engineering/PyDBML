@@ -100,6 +100,7 @@ Nodes must:
 | FunctionDefNode | function definition |
 | MethodDefNode | method definition |
 | ObjectDefNode | object definition |
+| ImportNode | module or file import |
 
 ---
 
@@ -305,11 +306,32 @@ args: list\[expression]
 
 ```
 
-Semantics:
+### Semantics
 
-- Resolve object
-- Resolve method
-- Execute method
+1. Evaluate target
+2. Resolve method using resolution order
+3. Execute method
+
+### Method Resolution Order
+
+1. Built-in methods
+2. PyDBML object methods
+3. Plugin/extension methods
+4. Native Python methods
+
+### Case Insensitivity
+
+Method names are treated case-insensitively:
+
+```
+
+!x.write()
+!x.WRITE()
+!x.WrItE()
+
+```
+
+All resolve to the same method.
 
 ---
 
@@ -325,9 +347,45 @@ args: list\[expression]
 
 Creates object instance.
 
+### Extended Behavior
+
+Object creation supports:
+
+- PyDBML object definitions
+- Plugin classes
+- Python classes
+- Python functions (treated as constructors)
+- Module-backed objects
+
 ---
 
-### 4.13 DotAccessNode
+### 4.13 ImportNode
+
+```
+
+ImportNode:
+path: string
+is\_module: boolean
+
+```
+
+### Semantics
+
+- If `is_module = False`
+  → load file/plugin module
+
+- If `is_module = True`
+  → import Python module
+
+### Module Import Behavior
+
+- Module is loaded into runtime registry
+- Classes are registered for object creation
+- Functions are registered for invocation
+
+---
+
+### 4.14 DotAccessNode
 
 ```
 
@@ -339,9 +397,15 @@ attribute: identifier
 
 Returns attribute or method reference.
 
+Supports:
+
+- PyDBML objects
+- Plugin objects
+- Python objects (via reflection)
+
 ---
 
-### 4.14 DotAssignNode
+### 4.15 DotAssignNode
 
 ```
 
@@ -356,7 +420,7 @@ Assigns object attribute.
 
 ---
 
-### 4.15 IndexAccessNode
+### 4.16 IndexAccessNode
 
 ```
 
@@ -370,7 +434,7 @@ Retrieves array value.
 
 ---
 
-### 4.16 IndexAssignNode
+### 4.17 IndexAssignNode
 
 ```
 
@@ -385,7 +449,7 @@ Sets array value.
 
 ---
 
-### 4.17 ReturnNode
+### 4.18 ReturnNode
 
 ```
 
@@ -398,7 +462,7 @@ Raises ReturnSignal.
 
 ---
 
-### 4.18 HandleNode
+### 4.19 HandleNode
 
 ```
 
@@ -409,7 +473,7 @@ else\_block: block
 
 ```
 
-Handles errors.
+Handles runtime errors.
 
 ---
 
@@ -479,7 +543,31 @@ ReturnNode → exit signal
 
 ---
 
-## 9. Error Integration
+## 9. Python Interoperability in AST
+
+The AST supports direct interaction with Python runtime.
+
+### Key Concepts
+
+- Python objects are wrapped internally (e.g., `PluginObject`)
+- Method calls are dispatched dynamically
+- Native Python methods are invoked via fallback resolution
+
+### Example Flow
+
+```
+
+ObjectNode(open)
+→ Python function call
+→ returns file object
+→ MethodCallNode(write)
+→ invokes Python method
+
+```
+
+---
+
+## 10. Error Integration
 
 Nodes may:
 
@@ -489,7 +577,7 @@ Nodes may:
 
 ---
 
-## 10. Optimization Potential
+## 11. Optimization Potential
 
 AST enables:
 
@@ -499,7 +587,7 @@ AST enables:
 
 ---
 
-## 11. Execution Example
+## 12. Execution Example
 
 Program:
 
@@ -520,26 +608,27 @@ AssignNode
 
 Execution:
 
-1. Evaluate BinaryOpNode → 8
+1. Evaluate BinaryOpNode → 8  
 2. Assign to x
 
 ---
 
-## 12. Design Guarantees
+## 13. Design Guarantees
 
 AST design guarantees:
 
 - deterministic execution
 - clear structure
 - extensibility
+- seamless Python integration
 - compatibility with interpreter and compiler models
 
 ---
 
-## 13. Limitations
+## 14. Limitations
 
 Current AST does not include:
 
-- type annotations in nodes (runtime only)
-- optimization metadata
-- static analysis hooks
+- static type enforcement
+- compile-time optimization metadata
+- advanced static analysis hooks

@@ -9,6 +9,7 @@ PyDBML provides an object system that supports:
 - Attribute assignment
 - Method invocation
 - Plugin-backed objects
+- Python object integration
 - User-defined objects
 
 Objects are runtime entities represented internally as instances.
@@ -19,19 +20,40 @@ Objects are runtime entities represented internally as instances.
 
 PyDBML distinguishes between:
 
+---
+
 ### 2.1 Built-in Objects
 
-Objects implemented using Python classes, such as:
+Objects implemented as core runtime types:
 
 - Real
 - String
 - Array
+- Boolean
 
 ---
 
 ### 2.2 Plugin Objects
 
-Objects created through Python plugins:
+Objects created from Python runtime:
+
+```
+
+PluginObject(obj)
+
+````
+
+### Sources
+
+- Python functions (e.g., `open`)
+- Python classes
+- External libraries
+
+---
+
+### 2.3 Plugin Classes
+
+Objects created via Python integration:
 
 ```python
 @pydbml_class
@@ -40,9 +62,9 @@ class Custom:
 
 ***
 
-### 2.3 User-Defined Objects
+### 2.4 User-Defined Objects
 
-Objects defined within PyDBML code via AST definitions.
+Objects defined within PyDBML code via object definitions.
 
 ***
 
@@ -62,41 +84,61 @@ Object creation proceeds as follows:
 
 1. Evaluate all argument expressions
 2. Resolve object type
-3. Create instance
-4. Invoke constructor (if defined)
+3. Execute constructor logic:
+   * Python function call OR
+   * Python class instantiation OR
+   * PyDBML object creation
+4. Wrap result if needed
 
 ***
 
 ### 3.3 Type Resolution
 
-Resolution order:
+Resolution order (final runtime behavior ✅):
 
 ```
-1. Plugin classes
-2. Built-in types
-3. User-defined object definitions
-4. External file loader
+1. Python functions (e.g., open)
+2. Plugin classes
+3. Built-in types
+4. User-defined object definitions
+5. File-loaded objects
 ```
 
-If type is not found → error.
+If not found → error
+
+***
+
+### 3.4 Python Object Creation
+
+If type resolves to a Python function:
+
+```
+object open(...)
+```
+
+Execution:
+
+```
+call Python function → return object → wrap as PluginObject
+```
 
 ***
 
 ## 4. Object Structure
 
-An object consists of:
+***
+
+### 4.1 ObjectInstance
 
 ```
 ObjectInstance:
     - definition (metadata)
-    - value (attribute storage)
+    - attributes (values)
 ```
 
 ***
 
-### 4.1 Attribute Storage
-
-Attributes are stored as:
+### 4.2 Attribute Storage
 
 ```
 attribute_name → value
@@ -104,12 +146,19 @@ attribute_name → value
 
 ***
 
-### 4.2 Method Storage
-
-Methods are associated with the object definition:
+### 4.3 Method Storage
 
 ```
 method_name → method implementation
+```
+
+***
+
+### 4.4 PluginObject Structure
+
+```
+PluginObject:
+    - obj (underlying Python object)
 ```
 
 ***
@@ -127,29 +176,31 @@ method_name → method implementation
 ### 5.2 Execution
 
 1. Evaluate object
-2. Lookup attribute
+2. Resolve attribute
 3. Return value
 
 ***
 
 ### 5.3 Resolution Rules
 
-For object instances:
+For ObjectInstance:
 
 ```
-1. Object attribute map
-2. Object methods (callable)
+1. Attribute map
+2. Methods (callable)
 3. Error if not found
 ```
 
 ***
 
-### 5.4 Plugin Objects
+### 5.4 PluginObject Access
 
-For plugin objects:
+For Python-backed objects:
 
-* Attributes resolved via Python `getattr`
-* Case-insensitive matching may apply
+```
+1. getattr(target, attribute)
+2. Case-insensitive fallback
+```
 
 ***
 
@@ -167,20 +218,23 @@ For plugin objects:
 
 1. Evaluate object
 2. Evaluate value
-3. Validate attribute exists (if typed object)
-4. Assign value
+3. Assign to attribute
 
 ***
 
 ### 6.3 Type Enforcement
 
-If object has declared attribute types:
+If object defines typed attributes:
 
 ```
 value must match expected type
 ```
 
-Else → TYPE\_ERROR
+Else:
+
+```
+TYPE_ERROR
+```
 
 ***
 
@@ -196,79 +250,114 @@ Else → TYPE\_ERROR
 
 ### 7.2 Execution
 
-1. Evaluate object
-2. Resolve method name
-3. Evaluate arguments
-4. Bind method context (`this`)
+1. Evaluate target object
+2. Evaluate arguments
+3. Unwrap PluginObject if needed
+4. Resolve method
 5. Execute method
-6. Return result
+6. Convert result to PyDBML type
 
 ***
 
 ## 8. Method Resolution
 
-### 8.1 Resolution Order
-
-For a method call:
+### 8.1 Resolution Order (FINAL ✅)
 
 ```
-1. User-defined object methods
-2. Plugin methods
-3. Built-in type methods
-4. Error if not found
+1. Built-in methods
+2. User-defined object methods
+3. Plugin/extension methods
+4. Native Python methods (fallback)
 ```
 
 ***
 
-### 8.2 Case Handling
+### 8.2 Native Python Method Fallback
 
-Method names are typically:
+If method not found:
+
+1. Check exact match:
 
 ```
-normalized to lowercase
-compared using uppercase mapping internally
+getattr(target, method_name)
 ```
+
+2. If not found:
+
+```
+search dir(target) for case-insensitive match
+```
+
+3. If found → execute
+
+Else:
+
+```
+METHOD_NOT_FOUND
+```
+
+***
+
+### 8.3 Case Handling
+
+Method names are:
+
+```
+case-insensitive
+```
+
+Examples:
+
+```
+write
+WRITE
+WrItE
+```
+
+All resolve to same method.
 
 ***
 
 ## 9. Binding Context (`this`)
 
-During method execution:
+For ObjectInstance:
 
 ```
-this → current object instance
+this → current object
 ```
 
-Accessible within method body.
+Used inside method definitions.
+
+***
+
+For PluginObject:
+
+* Python object itself acts as context
 
 ***
 
 ## 10. Constructor Execution
 
-### 10.1 Constructor Rule
+### 10.1 Rule
 
-If an object defines a method with the same name:
+For PyDBML object:
 
 ```
-type_name(...)
+method named type_name → constructor
 ```
-
-Then this method acts as constructor.
 
 ***
 
 ### 10.2 Execution
 
-1. Match constructor signature
-2. Bind arguments
+1. Match method
+2. Bind parameters
 3. Execute method
-4. Initialize object state
+4. Initialize attributes
 
 ***
 
 ### 10.3 Error Case
-
-If arguments do not match constructor:
 
 ```
 CONSTRUCTOR_ERROR
@@ -278,9 +367,9 @@ CONSTRUCTOR_ERROR
 
 ## 11. Plugin Object System
 
-### 11.1 Definition
+***
 
-Plugin classes are registered via:
+### 11.1 Class Registration
 
 ```python
 @pydbml_class
@@ -289,9 +378,7 @@ class ClassName:
 
 ***
 
-### 11.2 Methods
-
-Defined using:
+### 11.2 Method Definition
 
 ```python
 @pydbml_method("NAME")
@@ -300,9 +387,7 @@ def method(self, args):
 
 ***
 
-### 11.3 Operators
-
-Defined using:
+### 11.3 Operator Support
 
 ```python
 @pydbml_operator("+")
@@ -312,19 +397,17 @@ Defined using:
 
 ### 11.4 Execution
 
-Plugin methods:
-
-1. Bound to instance
-2. Called with Python arguments
-3. Result converted back to PyDBML type
+1. Method resolved
+2. Bound to instance
+3. Arguments converted to Python
+4. Method executed
+5. Result converted back
 
 ***
 
 ## 12. Method Cache
 
-### 12.1 Purpose
-
-Method cache improves performance.
+### 12.1 Structure
 
 ```
 class → method_map
@@ -336,7 +419,7 @@ class → method_map
 
 * Built once per class
 * Stored in evaluator
-* Reused across calls
+* Improves lookup performance
 
 ***
 
@@ -355,70 +438,81 @@ object → instance created
 ### 13.2 Usage
 
 ```
-methods + attributes accessed
+attributes + methods accessed
 ```
 
 ***
 
 ### 13.3 Destruction
 
-Objects are managed by runtime memory (Python GC).
+* Managed by Python garbage collector
 
 ***
 
 ## 14. Error Conditions
 
-| Error              | Description              |
-| ------------------ | ------------------------ |
-| ATTRIBUTE\_ERROR   | attribute does not exist |
-| METHOD\_NOT\_FOUND | method not found         |
-| TYPE\_ERROR        | invalid assignment       |
-| CONSTRUCTOR\_ERROR | invalid constructor      |
+| Error              | Description          |
+| ------------------ | -------------------- |
+| ATTRIBUTE\_ERROR   | attribute not found  |
+| METHOD\_NOT\_FOUND | method not resolved  |
+| TYPE\_ERROR        | invalid assignment   |
+| CONSTRUCTOR\_ERROR | constructor mismatch |
 
 ***
 
-## 15. Example
+## 15. Examples
+
+***
+
+### 15.1 Basic Object
 
 ```
 !obj = object sample()
-
 !obj.value = 10
-
 !x = !obj.value
 ```
 
 ***
 
-## 16. Method Example
+### 15.2 Python Object
 
 ```
-!x = !num.add(5)
+import module builtins
+
+!f = object open('file.txt', 'w')
+!f.write('Hello')
+!f.close()
 ```
-
-Execution:
-
-1. Resolve num
-2. Resolve method add
-3. Call method
-4. Return result
 
 ***
 
-## 17. Guarantees
+### 15.3 Case-Insensitive Method
+
+```
+!f.WRITE('Hello')
+!f.Close()
+```
+
+***
+
+## 16. Guarantees
 
 The object system guarantees:
 
 * consistent method resolution
-* strict attribute handling
-* predictable object behavior
-* runtime type validation
+* case-insensitive access
+* seamless Python integration
+* predictable runtime behavior
+* efficient method lookup
 
 ***
 
-## 18. Limitations
+## 17. Limitations
 
 The object system does not support:
 
-* inheritance (current)
-* polymorphism (limited)
-* static typing
+* inheritance (currently)
+* advanced polymorphism
+* static typing of all objects
+* restricted Python sandboxing
+

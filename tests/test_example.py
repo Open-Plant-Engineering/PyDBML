@@ -37,6 +37,14 @@ def run_file(filename):
     "example11_scope.pydbml",
     "example14_nested_calls.pydbml",
     "example15_complex.pydbml",
+    "example16_file_write.pydbml",
+    "example17_file_read.pydbml",
+    "example18_json_usage.pydbml",
+    "example19_case_insensitive_methods.pydbml",
+    "example20_object_python_mix.pydbml",
+    "example21_method_chaining.pydbml",
+    "example22_handle_specific_error.pydbml",
+    "example23_import_module_usage.pydbml",
 ])
 def test_examples_success(file):
     run_file(file)
