@@ -1,11 +1,26 @@
 [project]
-name = "pydbml"
+name = "pydbml-lang"
 version = "0.0.1"
 description = "Python Database Macro Language"
 authors = [{ name = "Shivang Kheradiya" }]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
+
+license = "MIT"
+license-files = ["LICENSE"]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Interpreters",
+    "Topic :: Software Development :: Compilers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -16,11 +31,12 @@ dev = [
     "mypy"
 ]
 
+[project.urls]
+Homepage = "https://github.com/Open-Plant-Engineering/PyDBML"
+Documentation = "https://github.com/Open-Plant-Engineering/PyDBML/tree/main/doc"
+
 [build-system]
-requires = [
-    "setuptools", 
-    "wheel"
-    ]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -28,11 +44,13 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+exclude = ["tests", "tests.*", "doc", "doc.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -q --strict-markers"
-
-[project.urls]
-Homepage = "https://github.com/Open-Plant-Engineering/PyDBML"
-Documentation = "https://github.com/Open-Plant-Engineering/PyDBML/tree/main/doc"
+pythonpath = ["src"]
+addopts = "-ra -q --strict-markers --cov=pydbml --cov-report=term-missing"
+markers = [
+    "slow: slow tests",
+    "integration: integration tests"
+]

@@ -150,6 +150,34 @@ docs/examples/
 
 ***
 
+## 📚 Examples Overview
+
+| File                                         | Category           | What it Demonstrates                  |
+| -------------------------------------------- | ------------------ | ------------------------------------- |
+| example1\_nested\_loops.pydbml               | Loops              | Nested loop execution                 |
+| example2\_factorial.pydbml                   | Functions          | Factorial logic using loops/functions |
+| example3\_if.pydbml                          | Control Flow       | IF / ELSE branching                   |
+| example4\_short\_circuit.pydbml              | Logic              | Short-circuit evaluation (AND/OR)     |
+| example5\_array.pydbml                       | Data Structures    | Array creation and indexing           |
+| example6\_values\_loop.pydbml                | Loops              | Iterating over array values           |
+| example7\_skip.pydbml                        | Loop Control       | `skipif` behavior                     |
+| example8\_break.pydbml                       | Loop Control       | Loop termination using `break`        |
+| example9\_method.pydbml                      | Objects            | Method invocation                     |
+| example10\_handle.pydbml                     | Error Handling     | Basic HANDLE usage                    |
+| example11\_scope.pydbml                      | Functions          | Variable scoping                      |
+| example14\_nested\_calls.pydbml              | Functions          | Nested function calls                 |
+| example15\_complex.pydbml                    | Combined           | Complex multi-feature example         |
+| example16\_file\_write.pydbml                | Python Integration | File writing using Python             |
+| example17\_file\_read.pydbml                 | Python Integration | File read/write cycle                 |
+| example18\_json\_usage.pydbml                | Python Integration | JSON parsing                          |
+| example19\_case\_insensitive\_methods.pydbml | Language Feature   | Case-insensitive method calls         |
+| example20\_object\_python\_mix.pydbml        | Integration        | Mixing objects with Python            |
+| example21\_method\_chaining.pydbml           | Advanced           | Sequential method usage               |
+| example22\_handle\_specific\_error.pydbml    | Error Handling     | Specific error handling               |
+| example23\_import\_module\_usage.pydbml      | Modules            | Importing Python modules              |
+
+***
+
 ## 🔌 Extensibility (Plugin System)
 
 Extend PyDBML using Python:
