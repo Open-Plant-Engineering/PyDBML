@@ -35,26 +35,6 @@ class String(PyDBMLType):
     def ne(self, other):
         return self.value != str(other)
 
-    @pydbml_operator(">")
-    @pydbml_method("GT")
-    def gt(self, other):
-        return self.value > str(other)
-
-    @pydbml_operator("<")
-    @pydbml_method("LT")
-    def lt(self, other):
-        return self.value < str(other)
-
-    @pydbml_operator(">=")
-    @pydbml_method("GEQ")
-    def ge(self, other):
-        return self.value >= str(other)
-
-    @pydbml_operator("<=")
-    @pydbml_method("LEQ")
-    def le(self, other):
-        return self.value <= str(other)
-
     # --------------------------
     # ✅ BASIC METHODS
     # --------------------------

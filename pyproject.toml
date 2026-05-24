@@ -1,8 +1,8 @@
 [project]
 name = "pydbml"
-version = "0.1.0"
-description = "Python Database Markup Language"
-authors = [{ name = "Your Name" }]
+version = "0.0.1"
+description = "Python Database Macro Language"
+authors = [{ name = "Shivang Kheradiya" }]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
@@ -17,9 +17,22 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools>=65"]
+requires = [
+    "setuptools", 
+    "wheel"
+    ]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q --strict-markers"
+
+[project.urls]
+Homepage = "https://github.com/Open-Plant-Engineering/PyDBML"
+Documentation = "https://github.com/Open-Plant-Engineering/PyDBML/tree/main/doc"
