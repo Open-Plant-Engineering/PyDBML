@@ -1,0 +1,8 @@
+!y = 'abc' + 5
+HANDLE (10, )
+    !x = 0
+ELSEHANDLE ANY
+    !x = -1
+ENDHANDLE
+
+

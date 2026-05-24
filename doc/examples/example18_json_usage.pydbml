@@ -1,0 +1,4 @@
+
+import module json
+
+!data = object loads('[1, 2, 3]')
