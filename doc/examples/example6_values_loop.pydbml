@@ -1,0 +1,9 @@
+!arr = object array()
+
+!arr[1] = 1
+!arr[2] = 2
+!sum = 0
+
+do !v values !arr
+    !sum = !sum + !v
+enddo

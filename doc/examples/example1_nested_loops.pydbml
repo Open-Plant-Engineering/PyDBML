@@ -1,0 +1,7 @@
+!sum = 0
+
+do !i from 1 to 3
+    do !j from 1 to 3
+        !sum = !sum + !i * !j
+    enddo
+enddo

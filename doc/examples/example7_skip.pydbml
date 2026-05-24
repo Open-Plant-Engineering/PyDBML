@@ -1,0 +1,6 @@
+!sum = 0
+
+do !i from 1 to 5
+    skip if (!i == 3)
+    !sum = !sum + !i
+enddo

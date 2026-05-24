@@ -1,0 +1,8 @@
+!x = 100
+
+define function !!test() is real
+    !x = 5
+    return !x
+endfunction
+
+!y = !!test()

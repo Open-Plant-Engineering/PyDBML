@@ -1,0 +1,8 @@
+!y = 5 + |abc|
+HANDLE (10, 3)
+    !x = 100
+ELSEHANDLE ANY
+    !x = -1
+ENDHANDLE
+
+$p $!x

@@ -1,0 +1,5 @@
+define function !!add(!a is real, !b is real) is real
+    return !a + !b
+endfunction
+
+!x = !!add( !!add(1, 2) , 3 )

@@ -1,0 +1,10 @@
+!sum = 0
+
+define function !!calc(!n is real) is real
+    do !i from 1 to !n
+        skip if (!i == 2)
+        return !i * 10
+    enddo
+endfunction
+
+!result = !!calc(5)
