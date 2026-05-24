@@ -177,16 +177,6 @@ This means:
 
 ***
 
-## 🛠️ Roadmap
-
-* [ ] Full dictionary support
-* [ ] Method chaining (`obj.method().another()`)
-* [ ] Improved standard library
-* [ ] Sandbox execution mode
-* [ ] Performance optimizations
-
-***
-
 ## 🤝 Contributing
 
 Contributions are welcome!
@@ -196,12 +186,6 @@ See:
 ```
 docs/advanced/contributing.md
 ```
-
-***
-
-## 📜 License
-
-Add your license here (MIT recommended).
 
 ***
 
