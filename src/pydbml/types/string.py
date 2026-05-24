@@ -138,12 +138,3 @@ class String(PyDBMLType):
             return False
         raise TypeError("Cannot convert string to boolean")
 
-    # --------------------------
-    # ✅ REPRESENTATION
-    # --------------------------
-
-    def __str__(self):
-        return self.value
-
-    def __repr__(self):
-        return f"String({self.value})"
